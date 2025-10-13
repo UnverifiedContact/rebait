@@ -53,14 +53,14 @@ class YouTubeTranscriptFetcher:
             raise ValueError("No transcripts available for this video")
         
         # Convert to standard format
-        transcript_text = " ".join([entry.text for entry in transcript_data])
+        #transcript_text = " ".join([entry.text for entry in transcript_data])
         transcript_data_dict = [{'text': entry.text, 'start': entry.start, 'duration': entry.duration} for entry in transcript_data]
         
         result = {
             'video_id': video_id,
             'url': url,
             'transcript_data': transcript_data_dict,
-            'transcript_text': transcript_text,
+            #'transcript_text': transcript_text,
             'language': 'en'
         }
         

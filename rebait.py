@@ -4,6 +4,8 @@ Rebait - YouTube Transcript Fetcher
 A library for fetching and caching YouTube transcripts
 """
 
+import os
+import json
 import argparse
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
@@ -28,7 +30,7 @@ def main():
         print(f"Title: {metadata['title']}")
         print(f"Duration: {metadata['duration']}")
         print(f"Channel: {metadata['channel_name']}")
-        print(f"Uploader: {metadata['uploader']}")
+        print(f"Keywords: {', '.join(metadata['keywords'])}")
         print(f"Description: {metadata['description']}")
         
         # Always create flattened.txt

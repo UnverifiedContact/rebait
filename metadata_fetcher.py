@@ -40,8 +40,8 @@ class YouTubeMetadataFetcher:
             'duration': video_details.get('lengthSeconds', ''),
             'description': video_details.get('shortDescription', ''),
             'channel_name': video_details.get('author', ''),
-            'uploader': video_details.get('author', ''),  # Same as channel_name
             'channel_id': video_details.get('channelId', ''),
+            'keywords': video_details.get('keywords', []),
         }
     
     def _get_api_key(self, video_id):
