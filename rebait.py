@@ -9,6 +9,7 @@ import json
 import argparse
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
+from utils import extract_youtube_id
 
 
 def main():
@@ -18,15 +19,20 @@ def main():
     parser.add_argument('--cache-dir', default='cache', help='Cache directory path (default: cache)')
     
     args = parser.parse_args()
+    cache_dir = args.cache_dir
     
-    fetcher = YouTubeTranscriptFetcher(cache_dir=args.cache_dir)
+    # Extract and validate video ID from URL
+    video_id = extract_youtube_id(args.url)
+    if not video_id:
+        print(f"Error: Could not extract video ID from URL: {args.url}")
+        return 1
+    
+    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir)
+    metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir)
     
     try:
-        result = fetcher.get_transcript(args.url)
-        
-        # Fetch and display metadata
-        metadata_fetcher = YouTubeMetadataFetcher()
-        metadata = metadata_fetcher.fetch_metadata(result['video_id'])
+        transcript = transcript_fetcher.get_transcript(args.url)       
+        metadata = metadata_fetcher.fetch_metadata(video_id)
         
         print(f"Title: {metadata['title']}")
         print(f"Duration: {metadata['duration']}")
@@ -35,8 +41,7 @@ def main():
         print(f"Description: {metadata['description']}")
         
         # Always create flattened.txt
-        cache_folder = os.path.join(fetcher.cache_dir, result['video_id'])
-        fetcher.generate_flattened(result['transcript_data'], cache_folder)
+        flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
         
     except Exception as e:
         print(f"Error: {e}")

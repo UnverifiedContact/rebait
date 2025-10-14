@@ -17,8 +17,11 @@ class YouTubeTranscriptFetcher:
         self.cache_dir = cache_dir
         self._ensure_cache_dir()
     
+    def set_cache_dir(self, cache_dir):
+        self.cache_dir = cache_dir
+        self._ensure_cache_dir()
+    
     def _ensure_cache_dir(self):
-        """Ensure the cache directory exists"""
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
     
@@ -71,10 +74,11 @@ class YouTubeTranscriptFetcher:
                 return json.load(f)
         return None
     
-    def generate_flattened(self, transcript_data, cache_folder):
+    def generate_flattened(self, transcript_data, video_id):
         import re
         
         regex_pattern = re.compile(r'^\s*>>\s*')
+        cache_folder = os.path.join(self.cache_dir, video_id)
         output_path = os.path.join(cache_folder, 'flattened.txt')
         
         flattened_lines = []
