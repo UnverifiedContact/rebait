@@ -1,5 +1,6 @@
 import re
 import os
+import time
 from urllib.parse import urlparse, parse_qs
 
 
@@ -38,4 +39,35 @@ def write_file_content(file_path: str, content: str) -> None:
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
+
+class Timer:
+    """Simple timer context manager for benchmarking operations"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.start_time = None
+        self.duration = None
+    
+    def __enter__(self):
+        self.start_time = time.time()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.duration = time.time() - self.start_time
+    
+    def get_duration(self) -> float:
+        """Get duration in seconds"""
+        return self.duration or 0.0
+
+
+def format_duration(seconds: float) -> str:
+    """Format duration in a human-readable way"""
+    if seconds < 1:
+        return f"{seconds*1000:.1f}ms"
+    elif seconds < 60:
+        return f"{seconds:.2f}s"
+    else:
+        minutes = int(seconds // 60)
+        remaining_seconds = seconds % 60
+        return f"{minutes}m {remaining_seconds:.1f}s"
 

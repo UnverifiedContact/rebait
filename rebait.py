@@ -12,7 +12,7 @@ from typing import Dict, Any
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
-from utils import extract_youtube_id
+from utils import extract_youtube_id, Timer
 
 
 def main():
@@ -36,19 +36,33 @@ def main():
     ai_service = AIService()
     
     try:
+        transcript_timer = None
+        metadata_timer = None
+        gemini_timer = None
+        
+        with Timer("transcript") as transcript_timer:
+            transcript = transcript_fetcher.get_transcript(args.url)       
+            flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
 
-        transcript = transcript_fetcher.get_transcript(args.url)       
-        flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
-
-        metadata = metadata_fetcher.fetch_metadata(video_id)
+        with Timer("metadata") as metadata_timer:
+            metadata = metadata_fetcher.fetch_metadata(video_id)
         
         ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
       
-        gemini_response = ai_service.process_with_gemini(
-            video_id, cache_dir, metadata, flattened_text, args.gemini_model
-        )
+        with Timer("gemini") as gemini_timer:
+            gemini_response = ai_service.process_with_gemini(
+                video_id, cache_dir, metadata, flattened_text, args.gemini_model
+            )
         
-        print(gemini_response)
+        result = {
+            "transcript_duration": transcript_timer.get_duration(),
+            "metadata_duration": metadata_timer.get_duration(),
+            "gemini_duration": gemini_timer.get_duration(),
+            "total_duration": transcript_timer.get_duration() + metadata_timer.get_duration() + gemini_timer.get_duration(),
+            "title": gemini_response.strip()
+        }
+        
+        print(json.dumps(result, indent=2))
         
     except Exception as e:
         print(f"Error: {e}")
