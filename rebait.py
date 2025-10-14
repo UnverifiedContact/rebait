@@ -36,7 +36,8 @@ def main():
     parser = argparse.ArgumentParser(description='Fetch YouTube transcripts')
     parser.add_argument('url', help='YouTube video URL')
     parser.add_argument('--cache-dir', default=os.path.join(os.environ.get('TMP', '/tmp'), 'rebait_cache'), help='Cache directory path (default: $TMP/rebait_cache)')
-    parser.add_argument('--gemini-model', default='gemini-2.0-flash', help='Gemini model to use (default: gemini-2.0-flash)')
+    parser.add_argument('--gemini-key', help='Gemini API key (optional, defaults to GEMINI_API_KEY env var)')
+    parser.add_argument('-f', '--force', action='store_true', help='Force refresh all cached data')
     
     args = parser.parse_args()
     cache_dir = args.cache_dir
@@ -46,9 +47,9 @@ def main():
         print(f"Error: Could not extract video ID from URL: {args.url}")
         return 1
     
-    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir)
-    metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir)
-    ai_service = AIService()
+    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force)
+    metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir, force=args.force)
+    ai_service = AIService(force=args.force)
     
     try:
         # Measure total wall-clock time
@@ -61,7 +62,7 @@ def main():
           
             with Timer("gemini") as gemini_timer:
                 gemini_response = ai_service.process_with_gemini(
-                    video_id, cache_dir, metadata, flattened_text, args.gemini_model
+                    video_id, cache_dir, metadata, flattened_text, args.gemini_key
                 )
         
         total_seconds = total_timer.duration

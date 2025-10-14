@@ -13,11 +13,12 @@ import os
 class YouTubeMetadataFetcher:
     """Modular metadata fetcher using YouTube innertube API"""
     
-    def __init__(self, cache_dir="cache", api_url=None, context=None):
+    def __init__(self, cache_dir="cache", api_url=None, context=None, force=False):
         self.cache_dir = cache_dir
         self.api_url = api_url or "https://www.youtube.com/youtubei/v1/player?key={api_key}"
         self.context = context or {"client": {"clientName": "ANDROID", "clientVersion": "20.10.38"}}
         self.watch_url = "https://www.youtube.com/watch?v={video_id}"
+        self.force = force
         self._ensure_cache_dir()
     
     def set_cache_dir(self, cache_dir):
@@ -30,10 +31,8 @@ class YouTubeMetadataFetcher:
             os.makedirs(self.cache_dir)
     
     def fetch_metadata(self, video_id):
-        """Fetch video metadata from innertube API with caching"""
-        cached_metadata = self._load_from_cache(video_id)
-        if cached_metadata:
-            return cached_metadata
+        if not self.force:
+            return self._load_from_cache(video_id)
         
         metadata = self._fetch_from_api(video_id)
         self._save_to_cache(video_id, metadata)

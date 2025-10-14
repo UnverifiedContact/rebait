@@ -13,8 +13,9 @@ from utils import extract_youtube_id
 class YouTubeTranscriptFetcher:
     """A class to fetch and cache YouTube transcripts"""
     
-    def __init__(self, cache_dir="cache"):
+    def __init__(self, cache_dir="cache", force=False):
         self.cache_dir = cache_dir
+        self.force = force
         self._ensure_cache_dir()
     
     def set_cache_dir(self, cache_dir):
@@ -26,15 +27,12 @@ class YouTubeTranscriptFetcher:
             os.makedirs(self.cache_dir)
     
     def get_transcript(self, url):
-        """Fetch transcript for a YouTube video"""
         video_id = extract_youtube_id(url)
         if not video_id:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
-        # Check cache first
-        cached_transcript = self._load_from_cache(video_id)
-        if cached_transcript:
-            return cached_transcript
+        if not self.force:
+            return self._load_from_cache(video_id)
         
         try:
             api = YouTubeTranscriptApi()

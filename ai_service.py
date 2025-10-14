@@ -15,25 +15,24 @@ from utils import read_file_content, write_file_content
 load_dotenv()
 
 
-def query_gemini(content: str, model_name: str = None) -> str:
+def query_gemini(content: str, gemini_key: str = None) -> str:
     """
     Query Gemini LLM using REST API.
     
     Args:
         content: The text content to send to Gemini
-        model_name: The Gemini model to use (defaults to GEMINI_MODEL env var)
+        gemini_key: The Gemini API key (defaults to GEMINI_API_KEY env var)
     
     Returns:
         The response from Gemini
     """
-    # Get API key from environment variable
-    api_key = os.getenv('GEMINI_API_KEY')
+    # Get API key from parameter or environment variable
+    api_key = gemini_key or os.getenv('GEMINI_API_KEY')
     if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
+        raise ValueError("Gemini API key must be provided via --gemini-key argument or GEMINI_API_KEY environment variable")
     
-    # Use provided model name or default from environment
-    if model_name is None:
-        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
+    # Use default model from environment
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
     
@@ -64,8 +63,8 @@ def query_gemini(content: str, model_name: str = None) -> str:
 class AIService:
     """Handles AI operations including prompt generation, LLM communication, and API management"""
     
-    def __init__(self):
-        pass
+    def __init__(self, force=False):
+        self.force = force
     
     def generate_prompt(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
                        flattened_subtitles: str) -> None:
@@ -88,16 +87,15 @@ class AIService:
         return final_content
     
     def process_with_gemini(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
-                           flattened_subtitles: str, model_name: str = None) -> str:
+                           flattened_subtitles: str, gemini_key: str = None) -> str:
         
-        # Check if we already have a cached response
-        cached_response = self._load_cached_response(video_id, cache_dir)
-        if cached_response:
-            return cached_response
+        # Check if we already have a cached response (unless force is True)
+        if not self.force:
+            return self._load_cached_response(video_id, cache_dir)
         
         prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
         
-        response = query_gemini(prompt, model_name)
+        response = query_gemini(prompt, gemini_key)
         
         # Cache the response
         self._save_response_to_cache(video_id, cache_dir, response)
