@@ -47,9 +47,14 @@ def main():
         print(f"Error: Could not extract video ID from URL: {args.url}")
         return 1
     
+    api_key = args.gemini_key or os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print("Error: Gemini API key must be provided via --gemini-key argument or GEMINI_API_KEY environment variable")
+        return 1
+    
     transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force)
     metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir, force=args.force)
-    ai_service = AIService(force=args.force)
+    ai_service = AIService(api_key=api_key, force=args.force)
     
     try:
         # Measure total wall-clock time
@@ -62,7 +67,7 @@ def main():
           
             with Timer("gemini") as gemini_timer:
                 gemini_response = ai_service.process_with_gemini(
-                    video_id, cache_dir, metadata, flattened_text, args.gemini_key
+                    video_id, cache_dir, metadata, flattened_text
                 )
         
         total_seconds = total_timer.duration

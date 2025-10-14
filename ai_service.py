@@ -11,27 +11,12 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 from utils import read_file_content, write_file_content
 
-# Load environment variables from .env file
 load_dotenv()
 
-
-def query_gemini(content: str, gemini_key: str = None) -> str:
-    """
-    Query Gemini LLM using REST API.
-    
-    Args:
-        content: The text content to send to Gemini
-        gemini_key: The Gemini API key (defaults to GEMINI_API_KEY env var)
-    
-    Returns:
-        The response from Gemini
-    """
-    # Get API key from parameter or environment variable
-    api_key = gemini_key or os.getenv('GEMINI_API_KEY')
+def query_gemini(content: str, api_key: str) -> str:
     if not api_key:
-        raise ValueError("Gemini API key must be provided via --gemini-key argument or GEMINI_API_KEY environment variable")
+        raise ValueError("Gemini API key must be provided")
     
-    # Use default model from environment
     model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
@@ -63,7 +48,8 @@ def query_gemini(content: str, gemini_key: str = None) -> str:
 class AIService:
     """Handles AI operations including prompt generation, LLM communication, and API management"""
     
-    def __init__(self, force=False):
+    def __init__(self, api_key: str, force=False):
+        self.api_key = api_key
         self.force = force
     
     def generate_prompt(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
@@ -87,19 +73,15 @@ class AIService:
         return final_content
     
     def process_with_gemini(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
-                           flattened_subtitles: str, gemini_key: str = None) -> str:
+                           flattened_subtitles: str) -> str:
         
-        # Check if we already have a cached response (unless force is True)
         if not self.force:
             cached_response = self._load_cached_response(video_id, cache_dir)
             if cached_response is not None:
                 return cached_response
         
         prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
-        
-        response = query_gemini(prompt, gemini_key)
-        
-        # Cache the response
+        response = query_gemini(prompt, self.api_key)
         self._save_response_to_cache(video_id, cache_dir, response)
         
         return response
