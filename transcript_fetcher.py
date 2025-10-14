@@ -85,8 +85,11 @@ class YouTubeTranscriptFetcher:
         for segment in transcript_data:
             text = segment.get('text', '')
             if regex_pattern.match(text):
+                # Remove >> prefix for dialogue lines
                 clean_text = regex_pattern.sub('', text)
                 flattened_lines.append(clean_text)
+            elif text.strip():  # Include all non-empty text segments
+                flattened_lines.append(text)
         
         flattened_text = '\n'.join(flattened_lines)
         
