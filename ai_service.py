@@ -90,7 +90,45 @@ class AIService:
     def process_with_gemini(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
                            flattened_subtitles: str, model_name: str = None) -> str:
         
+        # Check if we already have a cached response
+        cached_response = self._load_cached_response(video_id, cache_dir)
+        if cached_response:
+            return cached_response
+        
         prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
         
-        return query_gemini(prompt, model_name)
+        response = query_gemini(prompt, model_name)
+        
+        # Cache the response
+        self._save_response_to_cache(video_id, cache_dir, response)
+        
+        return response
+    
+    def _get_title_cache_path(self, video_id: str, cache_dir: str) -> str:
+        """Get the cache file path for the title response"""
+        video_cache_dir = os.path.join(cache_dir, video_id)
+        if not os.path.exists(video_cache_dir):
+            os.makedirs(video_cache_dir)
+        return os.path.join(video_cache_dir, 'title.txt')
+    
+    def _load_cached_response(self, video_id: str, cache_dir: str) -> str:
+        """Load cached response if it exists"""
+        cache_path = self._get_title_cache_path(video_id, cache_dir)
+        if os.path.exists(cache_path):
+            content = read_file_content(cache_path)
+            # If the content is JSON, extract the title
+            if content.strip().startswith('{'):
+                import json
+                try:
+                    data = json.loads(content)
+                    return data.get('title', content)
+                except json.JSONDecodeError:
+                    return content
+            return content
+        return None
+    
+    def _save_response_to_cache(self, video_id: str, cache_dir: str, response: str) -> None:
+        """Save response to cache"""
+        cache_path = self._get_title_cache_path(video_id, cache_dir)
+        write_file_content(cache_path, response)
     

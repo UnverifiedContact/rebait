@@ -66,7 +66,14 @@ class YouTubeTranscriptFetcher:
         cache_path = self._get_cache_path(video_id)
         if os.path.exists(cache_path):
             with open(cache_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Handle both old format (wrapper object) and new format (direct array)
+                if isinstance(data, dict) and 'transcript_data' in data:
+                    return data['transcript_data']
+                elif isinstance(data, list):
+                    return data
+                else:
+                    return data
         return None
     
     def generate_flattened(self, transcript_data, video_id):
