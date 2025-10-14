@@ -35,7 +35,7 @@ def fetch_video_data(transcript_fetcher, metadata_fetcher, url, video_id):
 def main():
     parser = argparse.ArgumentParser(description='Fetch YouTube transcripts')
     parser.add_argument('url', help='YouTube video URL')
-    parser.add_argument('--cache-dir', default='cache', help='Cache directory path (default: cache)')
+    parser.add_argument('--cache-dir', default=os.path.join(os.environ.get('TMP', '/tmp'), 'rebait_cache'), help='Cache directory path (default: $TMP/rebait_cache)')
     parser.add_argument('--gemini-model', default='gemini-2.0-flash', help='Gemini model to use (default: gemini-2.0-flash)')
     
     args = parser.parse_args()
