@@ -4,6 +4,7 @@ Test script for rebait functionality
 """
 
 from rebait import YouTubeTranscriptFetcher
+from utils import extract_youtube_id
 
 def test_url_parsing():
     """Test URL parsing functionality"""
@@ -18,7 +19,7 @@ def test_url_parsing():
     
     print("Testing URL parsing:")
     for url in test_urls:
-        video_id = fetcher.extract_video_id(url)
+        video_id = extract_youtube_id(url)
         print(f"  {url} -> {video_id}")
     
     return True

@@ -5,6 +5,7 @@ This demonstrates the core functionality even if YouTube API has issues
 """
 
 from rebait import YouTubeTranscriptFetcher
+from utils import extract_youtube_id
 import json
 import os
 
@@ -63,7 +64,7 @@ def demo_url_parsing():
     
     print("Testing URL parsing:")
     for url in test_urls:
-        video_id = fetcher.extract_video_id(url)
+        video_id = extract_youtube_id(url)
         status = "✅" if video_id == "dQw4w9WgXcQ" else "❌"
         print(f"  {status} {url} -> {video_id}")
     
@@ -84,7 +85,7 @@ from rebait import YouTubeTranscriptFetcher
 fetcher = YouTubeTranscriptFetcher(cache_dir="my_cache")
 
 # Extract video ID from URL
-video_id = fetcher.extract_video_id("https://www.youtube.com/watch?v=VIDEO_ID")
+video_id = extract_youtube_id("https://www.youtube.com/watch?v=VIDEO_ID")
 
 # Get transcript (will cache automatically)
 result = fetcher.get_transcript("https://www.youtube.com/watch?v=VIDEO_ID")

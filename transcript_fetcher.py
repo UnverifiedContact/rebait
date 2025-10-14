@@ -6,16 +6,15 @@ A class for fetching and caching YouTube transcripts
 
 import os
 import json
-import re
-from urllib.parse import urlparse, parse_qs
 from youtube_transcript_api import YouTubeTranscriptApi
+from utils import extract_youtube_id
 
 
 class YouTubeTranscriptFetcher:
     """A class to fetch and cache YouTube transcripts"""
     
-    def __init__(self):
-        self.cache_dir = "cache"
+    def __init__(self, cache_dir="cache"):
+        self.cache_dir = cache_dir
         self._ensure_cache_dir()
     
     def _ensure_cache_dir(self):
@@ -23,27 +22,10 @@ class YouTubeTranscriptFetcher:
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
     
-    def extract_youtube_id(self, value: str) -> str | None:
-        """Extract YouTube video ID from URL or return the ID if already provided."""
-        if not value:
-            return None
-        value = value.strip()
-        if re.fullmatch(r"[A-Za-z0-9_-]{11}", value):
-            return value
-        parsed = urlparse(value)
-        if parsed.hostname in ("www.youtube.com", "youtube.com"):
-            if parsed.path == "/watch":
-                return parse_qs(parsed.query).get("v", [None])[0]
-            m = re.match(r"^/(embed|shorts)/([^/?#&]+)", parsed.path)
-            if m:
-                return m.group(2)
-        if parsed.hostname == "youtu.be":
-            return parsed.path.lstrip("/")
-        return None
     
     def get_transcript(self, url):
         """Fetch transcript for a YouTube video"""
-        video_id = self.extract_youtube_id(url)
+        video_id = extract_youtube_id(url)
         if not video_id:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
