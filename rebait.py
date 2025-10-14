@@ -1,22 +1,38 @@
 #!/usr/bin/env python3
-"""
-Rebait - YouTube Transcript Fetcher
-A library for fetching and caching YouTube transcripts
-"""
 
 import os
 import json
 import argparse
 from pathlib import Path
 from typing import Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
 from utils import extract_youtube_id, Timer, format_duration
 
+def fetch_video_data(transcript_fetcher, metadata_fetcher, url, video_id):
+    """Fetch transcript and metadata in parallel with timing"""
+    def timed_get_transcript():
+        with Timer("transcript") as timer:
+            result = transcript_fetcher.get_transcript(url)
+        return result, timer.duration
+    
+    def timed_fetch_metadata():
+        with Timer("metadata") as timer:
+            result = metadata_fetcher.fetch_metadata(video_id)
+        return result, timer.duration
+    
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        transcript_future = executor.submit(timed_get_transcript)
+        metadata_future = executor.submit(timed_fetch_metadata)
+        
+        transcript, transcript_duration = transcript_future.result()
+        metadata, metadata_duration = metadata_future.result()
+    
+    return transcript, transcript_duration, metadata, metadata_duration
 
 def main():
-    """Main CLI function"""
     parser = argparse.ArgumentParser(description='Fetch YouTube transcripts')
     parser.add_argument('url', help='YouTube video URL')
     parser.add_argument('--cache-dir', default='cache', help='Cache directory path (default: cache)')
@@ -25,7 +41,6 @@ def main():
     args = parser.parse_args()
     cache_dir = args.cache_dir
     
-    # Extract and validate video ID from URL
     video_id = extract_youtube_id(args.url)
     if not video_id:
         print(f"Error: Could not extract video ID from URL: {args.url}")
@@ -36,29 +51,24 @@ def main():
     ai_service = AIService()
     
     try:
-        transcript_timer = None
-        metadata_timer = None
-        gemini_timer = None
+        # Measure total wall-clock time
+        with Timer("total") as total_timer:
+            transcript, transcript_duration, metadata, metadata_duration = \
+                fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
+            
+            flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
+            ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
+          
+            with Timer("gemini") as gemini_timer:
+                gemini_response = ai_service.process_with_gemini(
+                    video_id, cache_dir, metadata, flattened_text, args.gemini_model
+                )
         
-        with Timer("transcript") as transcript_timer:
-            transcript = transcript_fetcher.get_transcript(args.url)       
-        flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
-
-        with Timer("metadata") as metadata_timer:
-            metadata = metadata_fetcher.fetch_metadata(video_id)
-        ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
-      
-        with Timer("gemini") as gemini_timer:
-            gemini_response = ai_service.process_with_gemini(
-                video_id, cache_dir, metadata, flattened_text, args.gemini_model
-            )
-        
-        # Calculate total duration in seconds for formatting
-        total_seconds = transcript_timer.duration + metadata_timer.duration + gemini_timer.duration
+        total_seconds = total_timer.duration
         
         result = {
-            "transcript_duration": transcript_timer.get_duration(),
-            "metadata_duration": metadata_timer.get_duration(),
+            "transcript_duration": format_duration(transcript_duration),
+            "metadata_duration": format_duration(metadata_duration),
             "gemini_duration": gemini_timer.get_duration(),
             "total_duration": format_duration(total_seconds),
             "title": gemini_response.strip()
