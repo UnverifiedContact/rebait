@@ -1,85 +1,96 @@
-# Rebait - YouTube Transcript Fetcher
+# Rebait - YouTube De-Clickbaited Video Titles
 
-A Python library and CLI tool for fetching and caching YouTube video transcripts.
+A Python tool to analyze YouTube video metadata to produce accurate, concise, non-clickbaity titles.
 
 ## Features
 
-- Fetch transcripts from YouTube videos using various URL formats
-- Automatic caching system to avoid repeated API calls
-- Support for multiple languages
-- Command-line interface for easy usage
-- Library interface for programmatic use
-- **Transcript analysis and filtering** with regex patterns
-- **Multiple output formats** (WEBVTT, SRT, filtered text files)
+- **Parallel Processing**: Fetches transcripts and metadata simultaneously for faster execution
+- **Intelligent Caching**: Avoids repeated API calls with automatic caching system
+- **AI-Powered Analysis**: Uses Google Gemini API to generate intelligent summaries
+- **Transcript Filtering**: Automatically filters dialogue lines and creates flattened text
+- **Comprehensive Metadata**: Fetches video title, duration, description, and channel information
+- **Performance Benchmarking**: Detailed timing information for each operation
 
 ## Installation
 
-1. Install the required dependencies:
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd rebait
+```
+
+2. Create and activate a virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
+4. Set up Google Gemini API key:
+```bash
+export GOOGLE_API_KEY="your-api-key-here"
+```
+
 ## Usage
 
-### Command Line Interface
+### Basic Usage
 
-Basic usage:
 ```bash
 python rebait.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-With options:
-```bash
-python rebait.py "https://www.youtube.com/watch?v=VIDEO_ID" --display --languages en es fr
-```
-
-### As a Library
-
-```python
-from rebait import YouTubeTranscriptFetcher
-
-fetcher = YouTubeTranscriptFetcher(cache_dir="my_cache")
-result = fetcher.get_transcript("https://www.youtube.com/watch?v=VIDEO_ID")
-
-print(f"Transcript: {result['transcript_text']}")
-```
-
-### Transcript Analysis
-
-```python
-from rebait import YouTubeTranscriptFetcher
-
-fetcher = YouTubeTranscriptFetcher()
-
-# Analyze dialogue lines (lines starting with >>)
-dialogue = fetcher.analyze_transcript("VIDEO_ID", pattern=r'^\s*>>\s*', output_filename='dialogue.txt')
-
-# Analyze music cues
-music = fetcher.analyze_transcript("VIDEO_ID", pattern=r'\[Music\]', output_filename='music.txt')
-
-# Custom pattern analysis
-custom = fetcher.analyze_transcript("VIDEO_ID", pattern=r'.*[Rr]obocop.*')
-```
-
-### Transcript Analysis
+### Advanced Options
 
 ```bash
-# Fetch transcript and automatically create flattened.txt with dialogue lines
-python rebait.py "https://www.youtube.com/watch?v=VIDEO_ID"
+# Specify cache directory
+python rebait.py "https://www.youtube.com/watch?v=VIDEO_ID" --cache-dir my_cache
 
-# Use custom regex pattern for flattening
-python rebait.py "https://www.youtube.com/watch?v=VIDEO_ID" --pattern "\[Music\]"
+# Use different Gemini model
+python rebait.py "https://www.youtube.com/watch?v=VIDEO_ID" --gemini-model gemini-1.5-pro
 ```
+
+### Output Format
+
+The tool outputs JSON with timing information and AI-generated summary:
+
+```json
+{
+  "transcript_duration": "2.5s",
+  "metadata_duration": "1.2s", 
+  "gemini_duration": "3.8s",
+  "total_duration": "7.5s",
+  "title": "AI-generated summary of the video content"
+}
+```
+
+## How It Works
+
+1. **Parallel Fetching**: Simultaneously fetches transcript and metadata
+2. **Caching**: Checks cache first to avoid redundant API calls
+3. **Text Processing**: Filters transcript to extract dialogue lines
+4. **AI Analysis**: Sends processed content to Gemini for intelligent summarization
+5. **Performance Tracking**: Measures and reports timing for each operation
 
 ## Cache Structure
 
-Transcripts are cached in the following structure:
 ```
 cache/
 └── {youtube_id}/
     ├── transcript.json          # Original transcript data
-    └── flattened.txt            # Cleaned dialogue lines (always created)
+    ├── metadata.json           # Video metadata
+    ├── flattened.txt           # Filtered dialogue lines
+    ├── final.txt              # AI-generated summary
+    └── gemini_response.txt     # Raw AI response (optional)
 ```
+
+**Note**: Cache entries may contain different combinations of files depending on processing stage:
+- **Complete**: All 5 files present (fully processed)
+- **Partial**: Some files missing (processing interrupted or failed)
+- **Empty**: Directory exists but no files (failed initial fetch)
 
 ## Supported URL Formats
 
@@ -89,9 +100,31 @@ cache/
 - `https://www.youtube.com/embed/VIDEO_ID`
 - `https://www.youtube.com/v/VIDEO_ID`
 
-## Command Line Options
+## Requirements
 
-- `url`: YouTube video URL (required)
-- `--cache-dir`: Cache directory path (default: cache)
-- `--languages`: Preferred languages in order (default: en)
-- `--display`: Display transcript text to console
+- Python 3.7+
+- Google Gemini API key
+- Internet connection for API calls
+
+## Performance Benefits
+
+- **Parallel Execution**: Transcript and metadata fetching run simultaneously
+- **Smart Caching**: Subsequent runs are significantly faster
+- **Efficient Processing**: Only processes new content when cache is empty
+
+## Error Handling
+
+The tool gracefully handles:
+- Missing transcripts
+- Network connectivity issues
+- Invalid YouTube URLs
+- API rate limiting
+
+## Development
+
+The codebase is modular with separate components:
+- `transcript_fetcher.py`: Handles YouTube transcript API
+- `metadata_fetcher.py`: Fetches video metadata
+- `ai_service.py`: Manages Gemini API interactions
+- `utils.py`: Utility functions and timing
+- `rebait.py`: Main CLI interface
