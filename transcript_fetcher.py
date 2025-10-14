@@ -32,14 +32,17 @@ class YouTubeTranscriptFetcher:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
         if not self.force:
-            return self._load_from_cache(video_id)
+            cached_data = self._load_from_cache(video_id)
+            if cached_data is not None:
+                return cached_data
         
+        # If no cache or force refresh, fetch from API
         try:
             api = YouTubeTranscriptApi()
             transcript_data = api.fetch(video_id, languages=['en'])
         except Exception as e:
-            # print(f"Failed to fetch English transcript: {e}")
-            raise ValueError("No transcripts found for this video.")
+            print(f"Error downloading subtitles: {e}")
+            raise ValueError("Failed to download subtitles for this video")
         
         transcript_data_dict = [{'text': entry.text, 'start': entry.start, 'duration': entry.duration} for entry in transcript_data]
         
@@ -76,6 +79,9 @@ class YouTubeTranscriptFetcher:
     
     def generate_flattened(self, transcript_data, video_id):
         import re
+        
+        if transcript_data is None:
+            return ""
         
         regex_pattern = re.compile(r'^\s*>>\s*')
         cache_folder = os.path.join(self.cache_dir, video_id)

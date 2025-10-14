@@ -32,7 +32,9 @@ class YouTubeMetadataFetcher:
     
     def fetch_metadata(self, video_id):
         if not self.force:
-            return self._load_from_cache(video_id)
+            cached_data = self._load_from_cache(video_id)
+            if cached_data is not None:
+                return cached_data
         
         metadata = self._fetch_from_api(video_id)
         self._save_to_cache(video_id, metadata)
@@ -41,29 +43,36 @@ class YouTubeMetadataFetcher:
     
     def _fetch_from_api(self, video_id):
         """Fetch video metadata from innertube API"""
-        # Get API key from watch page
-        api_key = self._get_api_key(video_id)
-        
-        response = requests.post(
-            self.api_url.format(api_key=api_key),
-            json={
-                "context": self.context,
-                "videoId": video_id,
-            },
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        video_details = data.get('videoDetails', {})
-        
-        return {
-            'title': video_details.get('title', ''),
-            'duration': video_details.get('lengthSeconds', ''),
-            'description': video_details.get('shortDescription', ''),
-            'channel_name': video_details.get('author', ''),
-            'channel_id': video_details.get('channelId', ''),
-            'keywords': video_details.get('keywords', []),
-        }
+        try:
+            # Get API key from watch page
+            api_key = self._get_api_key(video_id)
+            
+            response = requests.post(
+                self.api_url.format(api_key=api_key),
+                json={
+                    "context": self.context,
+                    "videoId": video_id,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            video_details = data.get('videoDetails', {})
+            
+            if not video_details:
+                raise ValueError(f"Failed to fetch metadata for video {video_id}")
+            
+            return {
+                'title': video_details.get('title', ''),
+                'duration': video_details.get('lengthSeconds', ''),
+                'description': video_details.get('shortDescription', ''),
+                'channel_name': video_details.get('author', ''),
+                'channel_id': video_details.get('channelId', ''),
+                'keywords': video_details.get('keywords', []),
+            }
+        except Exception as e:
+            print(f"Error fetching metadata: {e}")
+            raise ValueError(f"Failed to fetch metadata for video {video_id}: {e}")
     
     def _get_cache_path(self, video_id):
         """Get the cache file path for a video ID"""

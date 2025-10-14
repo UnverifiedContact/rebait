@@ -55,7 +55,9 @@ class AIService:
     def generate_prompt(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
                        flattened_subtitles: str) -> None:
 
-        prompt_content = read_file_content("prompt.txt")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        prompt_path = os.path.join(script_dir, "prompt.txt")
+        prompt_content = read_file_content(prompt_path)
         lines = [prompt_content, ""]
         
         lines.append(f"Title: {metadata.get('title', 'Unknown')}")
