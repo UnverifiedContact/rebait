@@ -71,22 +71,22 @@ class YouTubeTranscriptFetcher:
                 return json.load(f)
         return None
     
-    def generate_flattened(self, transcript_data, video_id):
-        """
-        Generate flattened text from transcript data
-        
-        Args:
-            transcript_data (list): List of transcript segments
-            video_id (str): YouTube video ID
-        """
+    def generate_flattened(self, transcript_data, cache_folder):
         import re
         
         regex_pattern = re.compile(r'^\s*>>\s*')
-        output_path = os.path.join(self.cache_dir, video_id, 'flattened.txt')
+        output_path = os.path.join(cache_folder, 'flattened.txt')
+        
+        flattened_lines = []
+        for segment in transcript_data:
+            text = segment.get('text', '')
+            if regex_pattern.match(text):
+                clean_text = regex_pattern.sub('', text)
+                flattened_lines.append(clean_text)
+        
+        flattened_text = '\n'.join(flattened_lines)
         
         with open(output_path, 'w', encoding='utf-8') as f:
-            for segment in transcript_data:
-                text = segment.get('text', '')
-                if regex_pattern.match(text):
-                    clean_text = regex_pattern.sub('', text)
-                    f.write(f"{clean_text}\n")
+            f.write(flattened_text)
+        
+        return flattened_text

@@ -15,10 +15,11 @@ def main():
     """Main CLI function"""
     parser = argparse.ArgumentParser(description='Fetch YouTube transcripts')
     parser.add_argument('url', help='YouTube video URL')
+    parser.add_argument('--cache-dir', default='cache', help='Cache directory path (default: cache)')
     
     args = parser.parse_args()
     
-    fetcher = YouTubeTranscriptFetcher()
+    fetcher = YouTubeTranscriptFetcher(cache_dir=args.cache_dir)
     
     try:
         result = fetcher.get_transcript(args.url)
@@ -34,7 +35,8 @@ def main():
         print(f"Description: {metadata['description']}")
         
         # Always create flattened.txt
-        fetcher.generate_flattened(result['transcript_data'], result['video_id'])
+        cache_folder = os.path.join(fetcher.cache_dir, result['video_id'])
+        fetcher.generate_flattened(result['transcript_data'], cache_folder)
         
     except Exception as e:
         print(f"Error: {e}")
