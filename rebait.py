@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description='Fetch YouTube transcripts')
     parser.add_argument('url', help='YouTube video URL')
     parser.add_argument('--cache-dir', default='cache', help='Cache directory path (default: cache)')
+    parser.add_argument('--gemini-model', default='gemini-2.0-flash', help='Gemini model to use (default: gemini-2.0-flash)')
     
     args = parser.parse_args()
     cache_dir = args.cache_dir
@@ -35,20 +36,19 @@ def main():
     ai_service = AIService()
     
     try:
+
         transcript = transcript_fetcher.get_transcript(args.url)       
+        flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
+
         metadata = metadata_fetcher.fetch_metadata(video_id)
         
-        print(f"Title: {metadata['title']}")
-        print(f"Duration: {metadata['duration']}")
-        print(f"Channel: {metadata['channel_name']}")
-        print(f"Keywords: {', '.join(metadata['keywords'])}")
-        print(f"Description: {metadata['description']}")
-        
-        # Always create flattened.txt
-        flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
-        
-        # Generate final AI prompt
         ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
+      
+        gemini_response = ai_service.process_with_gemini(
+            video_id, cache_dir, metadata, flattened_text, args.gemini_model
+        )
+        
+        print(gemini_response)
         
     except Exception as e:
         print(f"Error: {e}")
