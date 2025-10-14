@@ -20,5 +20,5 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Cache directory (optional - remove if you want to track cache)
+# Cache directory
 cache/
