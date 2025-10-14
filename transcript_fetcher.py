@@ -22,7 +22,6 @@ class YouTubeTranscriptFetcher:
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
     
-    
     def get_transcript(self, url):
         """Fetch transcript for a YouTube video"""
         video_id = extract_youtube_id(url)
