@@ -55,9 +55,9 @@ class Timer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.duration = time.time() - self.start_time
     
-    def get_duration(self) -> float:
-        """Get duration in seconds"""
-        return self.duration or 0.0
+    def get_duration(self) -> str:
+        """Get duration formatted in a human-readable way"""
+        return format_duration(self.duration or 0.0)
 
 
 def format_duration(seconds: float) -> str:
