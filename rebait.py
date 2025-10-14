@@ -48,7 +48,7 @@ def main():
         flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
         
         # Generate final AI prompt
-        ai_service.generate_and_save_prompt(video_id, cache_dir, metadata, flattened_text)
+        ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
         
     except Exception as e:
         print(f"Error: {e}")
