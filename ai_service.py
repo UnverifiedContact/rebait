@@ -75,14 +75,16 @@ class AIService:
         return final_content
     
     def process_with_gemini(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
-                           flattened_subtitles: str) -> str:
+                           flattened_subtitles: str, prompt: str = None) -> str:
         
         if not self.force:
             cached_response = self._load_cached_response(video_id, cache_dir)
             if cached_response is not None:
                 return cached_response
         
-        prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
+        if prompt is None:
+            prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
+        
         response = query_gemini(prompt, self.api_key)
         self._save_response_to_cache(video_id, cache_dir, response)
         

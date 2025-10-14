@@ -10,4 +10,4 @@ Avoid generating multiple titles. Secondary titles are unnecessary and will not 
 
 The title must be a single sentence, clear, concise, and non-clickbait.
 
-Limit to 140 characters.
+Limit the result to about 140 characters.

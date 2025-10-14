@@ -11,6 +11,46 @@ from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
 from utils import extract_youtube_id, Timer, format_duration
 
+def validate_cached_data(video_id, transcript_fetcher, metadata_fetcher):
+    """Validate that required cached files exist for AI-only mode. Returns list of missing files."""
+    missing_files = []
+    
+    # Check transcript cache
+    if transcript_fetcher._load_from_cache(video_id) is None:
+        missing_files.append('transcript.json')
+    
+    # Check metadata cache
+    if metadata_fetcher._load_from_cache(video_id) is None:
+        missing_files.append('metadata.json')
+    
+    # Check flattened text cache
+    flattened_path = os.path.join(transcript_fetcher.cache_dir, video_id, 'flattened.txt')
+    if not os.path.exists(flattened_path):
+        missing_files.append('flattened.txt')
+    
+    return missing_files
+
+def load_cached_data(video_id, cache_dir):
+    """Load cached transcript, metadata, and flattened text"""
+    video_cache_dir = os.path.join(cache_dir, video_id)
+    
+    # Load transcript
+    transcript_path = os.path.join(video_cache_dir, 'transcript.json')
+    with open(transcript_path, 'r', encoding='utf-8') as f:
+        transcript = json.load(f)
+    
+    # Load metadata
+    metadata_path = os.path.join(video_cache_dir, 'metadata.json')
+    with open(metadata_path, 'r', encoding='utf-8') as f:
+        metadata = json.load(f)
+    
+    # Load flattened text
+    flattened_path = os.path.join(video_cache_dir, 'flattened.txt')
+    with open(flattened_path, 'r', encoding='utf-8') as f:
+        flattened_text = f.read()
+    
+    return transcript, metadata, flattened_text
+
 def fetch_video_data(transcript_fetcher, metadata_fetcher, url, video_id):
     """Fetch transcript and metadata in parallel with timing"""
     def timed_get_transcript():
@@ -38,6 +78,7 @@ def main():
     parser.add_argument('--cache-dir', default=os.path.join(os.environ.get('TMP', '/tmp'), 'rebait_cache'), help='Cache directory path (default: $TMP/rebait_cache)')
     parser.add_argument('--gemini-key', help='Gemini API key (optional, defaults to GEMINI_API_KEY env var)')
     parser.add_argument('-f', '--force', action='store_true', help='Force refresh all cached data')
+    parser.add_argument('-a', '--ai-only', action='store_true', help='Only run the AI step to regenerate title, skip transcript/metadata fetching (requires existing cached data)')
     
     args = parser.parse_args()
     cache_dir = args.cache_dir
@@ -54,20 +95,39 @@ def main():
     
     transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force)
     metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir, force=args.force)
-    ai_service = AIService(api_key=api_key, force=args.force)
+
+    ai_force = args.force or args.ai_only
+    ai_service = AIService(api_key=api_key, force=ai_force)
     
     try:
         # Measure total wall-clock time
         with Timer("total") as total_timer:
-            transcript, transcript_duration, metadata, metadata_duration = \
-                fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
+            if args.ai_only:
+                # Validate cached data exists
+                missing_files = validate_cached_data(video_id, transcript_fetcher, metadata_fetcher)
+                if missing_files:
+                    # Fallback to normal mode if cache is missing
+                    transcript, transcript_duration, metadata, metadata_duration = \
+                        fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
+                    
+                    flattened_text = transcript_fetcher.generate_flattened(transcript, video_id)
+                else:
+                    # Load cached data
+                    transcript, metadata, flattened_text = load_cached_data(video_id, cache_dir)
+                    transcript_duration = 0  # No time spent fetching
+                    metadata_duration = 0    # No time spent fetching
+            else:
+                # Normal flow: fetch transcript and metadata
+                transcript, transcript_duration, metadata, metadata_duration = \
+                    fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
+                
+                flattened_text = transcript_fetcher.generate_flattened(transcript, video_id)
             
-            flattened_text = transcript_fetcher.generate_flattened(transcript, video_id)
-            ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
+            final_prompt = ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
           
             with Timer("gemini") as gemini_timer:
                 gemini_response = ai_service.process_with_gemini(
-                    video_id, cache_dir, metadata, flattened_text
+                    video_id, cache_dir, metadata, flattened_text, final_prompt
                 )
         
         total_seconds = total_timer.duration
