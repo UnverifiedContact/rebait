@@ -91,7 +91,9 @@ class AIService:
         
         # Check if we already have a cached response (unless force is True)
         if not self.force:
-            return self._load_cached_response(video_id, cache_dir)
+            cached_response = self._load_cached_response(video_id, cache_dir)
+            if cached_response is not None:
+                return cached_response
         
         prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
         
