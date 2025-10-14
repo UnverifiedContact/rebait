@@ -8,22 +8,32 @@ import os
 import requests
 from pathlib import Path
 from typing import Dict, Any
+from dotenv import load_dotenv
 from utils import read_file_content, write_file_content
 
+# Load environment variables from .env file
+load_dotenv()
 
-def query_gemini(content: str, model_name: str = "gemini-2.0-flash") -> str:
+
+def query_gemini(content: str, model_name: str = None) -> str:
     """
     Query Gemini LLM using REST API.
     
     Args:
         content: The text content to send to Gemini
-        model_name: The Gemini model to use (default: gemini-2.0-flash)
+        model_name: The Gemini model to use (defaults to GEMINI_MODEL env var)
     
     Returns:
         The response from Gemini
     """
-    # Hardcoded API key for now
-    api_key = "AIzaSyDr5EAUV6MzVwwP349drugnHXEJOeFGUoA"
+    # Get API key from environment variable
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY environment variable is not set")
+    
+    # Use provided model name or default from environment
+    if model_name is None:
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
     
@@ -78,7 +88,7 @@ class AIService:
         return final_content
     
     def process_with_gemini(self, video_id: str, cache_dir: str, metadata: Dict[str, Any], 
-                           flattened_subtitles: str, model_name: str = "gemini-2.0-flash") -> str:
+                           flattened_subtitles: str, model_name: str = None) -> str:
         
         prompt = self.generate_prompt(video_id, cache_dir, metadata, flattened_subtitles)
         
