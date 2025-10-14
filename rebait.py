@@ -7,8 +7,11 @@ A library for fetching and caching YouTube transcripts
 import os
 import json
 import argparse
+from pathlib import Path
+from typing import Dict, Any
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
+from ai_service import AIService
 from utils import extract_youtube_id
 
 
@@ -29,6 +32,7 @@ def main():
     
     transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir)
     metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir)
+    ai_service = AIService()
     
     try:
         transcript = transcript_fetcher.get_transcript(args.url)       
@@ -42,6 +46,9 @@ def main():
         
         # Always create flattened.txt
         flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
+        
+        # Generate final AI prompt
+        ai_service.generate_and_save_prompt(video_id, cache_dir, metadata, flattened_text)
         
     except Exception as e:
         print(f"Error: {e}")
