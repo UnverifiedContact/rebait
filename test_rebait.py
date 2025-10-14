@@ -3,7 +3,7 @@
 Test script for rebait functionality
 """
 
-from rebait import YouTubeTranscriptFetcher
+from transcript_fetcher import YouTubeTranscriptFetcher
 from utils import extract_youtube_id
 
 def test_url_parsing():
@@ -38,11 +38,12 @@ def test_transcript_fetch():
     for url in test_videos:
         try:
             print(f"\nTrying: {url}")
-            result = fetcher.get_transcript(url)
-            print(f"Success! Video ID: {result['video_id']}")
-            print(f"Language: {result['language']}")
-            print(f"Transcript length: {len(result['transcript_text'])} characters")
-            print(f"First 100 chars: {result['transcript_text'][:100]}...")
+            transcript_data = fetcher.get_transcript(url)
+            print(f"Success! Got transcript data")
+            print(f"Number of segments: {len(transcript_data)}")
+            if transcript_data:
+                first_text = transcript_data[0].get('text', '')
+                print(f"First segment text: {first_text[:100]}...")
             return True
         except Exception as e:
             print(f"Failed: {e}")

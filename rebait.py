@@ -56,7 +56,7 @@ def main():
             transcript, transcript_duration, metadata, metadata_duration = \
                 fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
             
-            flattened_text = transcript_fetcher.generate_flattened(transcript['transcript_data'], video_id)
+            flattened_text = transcript_fetcher.generate_flattened(transcript, video_id)
             ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
           
             with Timer("gemini") as gemini_timer:

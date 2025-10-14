@@ -31,27 +31,22 @@ class YouTubeTranscriptFetcher:
         if not video_id:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
+        # Check cache first
+        cached_transcript = self._load_from_cache(video_id)
+        if cached_transcript:
+            return cached_transcript
+        
         try:
             api = YouTubeTranscriptApi()
             transcript_data = api.fetch(video_id, languages=['en'])
         except Exception as e:
-            print(f"Failed to fetch English transcript: {e}")
-            raise ValueError("No transcripts available for this video")
+            # print(f"Failed to fetch English transcript: {e}")
+            raise ValueError("No transcripts found for this video.")
         
-        # Convert to standard format
-        #transcript_text = " ".join([entry.text for entry in transcript_data])
         transcript_data_dict = [{'text': entry.text, 'start': entry.start, 'duration': entry.duration} for entry in transcript_data]
         
-        result = {
-            'video_id': video_id,
-            'url': url,
-            'transcript_data': transcript_data_dict,
-            #'transcript_text': transcript_text,
-            'language': 'en'
-        }
-        
-        self._save_to_cache(video_id, result)
-        return result
+        self._save_to_cache(video_id, transcript_data_dict)
+        return transcript_data_dict
     
     def _get_cache_path(self, video_id):
         """Get the cache file path for a video ID"""
