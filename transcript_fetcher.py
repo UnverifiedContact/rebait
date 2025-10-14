@@ -6,6 +6,7 @@ A class for fetching and caching YouTube transcripts
 
 import os
 import json
+import re
 from urllib.parse import urlparse, parse_qs
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -22,26 +23,27 @@ class YouTubeTranscriptFetcher:
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
     
-    def extract_video_id(self, url):
-        """Extract YouTube video ID from various URL formats"""
-        parsed_url = urlparse(url)
-        
-        if parsed_url.hostname in ['www.youtube.com', 'youtube.com']:
-            if parsed_url.path == '/watch':
-                query_params = parse_qs(parsed_url.query)
-                return query_params.get('v', [None])[0]
-            elif parsed_url.path.startswith('/embed/'):
-                return parsed_url.path.split('/')[2]
-            elif parsed_url.path.startswith('/v/'):
-                return parsed_url.path.split('/')[2]
-        elif parsed_url.hostname == 'youtu.be':
-            return parsed_url.path[1:]
-        
+    def extract_youtube_id(self, value: str) -> str | None:
+        """Extract YouTube video ID from URL or return the ID if already provided."""
+        if not value:
+            return None
+        value = value.strip()
+        if re.fullmatch(r"[A-Za-z0-9_-]{11}", value):
+            return value
+        parsed = urlparse(value)
+        if parsed.hostname in ("www.youtube.com", "youtube.com"):
+            if parsed.path == "/watch":
+                return parse_qs(parsed.query).get("v", [None])[0]
+            m = re.match(r"^/(embed|shorts)/([^/?#&]+)", parsed.path)
+            if m:
+                return m.group(2)
+        if parsed.hostname == "youtu.be":
+            return parsed.path.lstrip("/")
         return None
     
     def get_transcript(self, url):
         """Fetch transcript for a YouTube video"""
-        video_id = self.extract_video_id(url)
+        video_id = self.extract_youtube_id(url)
         if not video_id:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
