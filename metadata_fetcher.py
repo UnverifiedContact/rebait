@@ -77,8 +77,7 @@ class YouTubeMetadataFetcher:
     def _get_cache_path(self, video_id):
         """Get the cache file path for a video ID"""
         video_cache_dir = os.path.join(self.cache_dir, video_id)
-        if not os.path.exists(video_cache_dir):
-            os.makedirs(video_cache_dir)
+        os.makedirs(video_cache_dir, exist_ok=True)
         return os.path.join(video_cache_dir, 'metadata.json')
     
     def _save_to_cache(self, video_id, metadata):
