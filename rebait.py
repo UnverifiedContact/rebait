@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
-from utils import extract_youtube_id, Timer, format_duration
+from utils import extract_youtube_id, Timer, format_duration, format_video_duration
 
 def validate_cached_data(video_id, transcript_fetcher, metadata_fetcher):
     """Validate that required cached files exist for AI-only mode. Returns list of missing files."""
@@ -140,10 +140,11 @@ def main():
         total_seconds = total_timer.duration
         
         result = {
-            "transcript_duration": format_duration(transcript_duration),
-            "metadata_duration": format_duration(metadata_duration),
-            "gemini_duration": gemini_timer.get_duration(),
-            "total_duration": format_duration(total_seconds),
+            "transcript_time": format_duration(transcript_duration),
+            "metadata_time": format_duration(metadata_duration),
+            "gemini_time": gemini_timer.get_duration(),
+            "total_time": format_duration(total_seconds),
+            "video_duration": format_video_duration(int(metadata.get('duration', 0))),
             "title": gemini_response.strip()
         }
         

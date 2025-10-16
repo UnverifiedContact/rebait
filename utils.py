@@ -61,13 +61,37 @@ class Timer:
 
 
 def format_duration(seconds: float) -> str:
-    """Format duration in a human-readable way"""
+    """Format duration in a human-readable way with time unit suffix"""
     if seconds < 1:
         return f"{seconds*1000:.1f}ms"
     elif seconds < 60:
-        return f"{seconds:.2f}s"
-    else:
         minutes = int(seconds // 60)
-        remaining_seconds = seconds % 60
-        return f"{minutes}m {remaining_seconds:.1f}s"
+        remaining_seconds = int(round(seconds % 60))
+        return f"{minutes}:{remaining_seconds:02d}s"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        remaining_seconds = int(seconds % 60)
+        
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}s"
+        else:
+            return f"{minutes:02d}:{remaining_seconds:02d}s"
+
+
+def format_video_duration(seconds: float) -> str:
+    """Format video duration in HH:MM:SS format without time unit suffix"""
+    if seconds < 60:
+        minutes = int(seconds // 60)
+        remaining_seconds = int(round(seconds % 60))
+        return f"{minutes}:{remaining_seconds:02d}"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        remaining_seconds = int(seconds % 60)
+        
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}"
+        else:
+            return f"{minutes:02d}:{remaining_seconds:02d}"
 
