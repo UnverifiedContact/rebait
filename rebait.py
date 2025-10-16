@@ -79,6 +79,7 @@ def main():
     parser.add_argument('--gemini-key', help='Gemini API key (optional, defaults to GEMINI_API_KEY env var)')
     parser.add_argument('-f', '--force', action='store_true', help='Force refresh all cached data')
     parser.add_argument('-a', '--ai-only', action='store_true', help='Only run the AI step to regenerate title, skip transcript/metadata fetching (requires existing cached data)')
+    parser.add_argument('-n', '--no-webshare', action='store_true', help='Do not use webshare credentials')
     
     args = parser.parse_args()
     cache_dir = args.cache_dir
@@ -93,7 +94,13 @@ def main():
         print("Error: Gemini API key must be provided via --gemini-key argument or GEMINI_API_KEY environment variable")
         return 1
     
-    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force)
+    webshare_username = None
+    webshare_password = None
+    if not args.no_webshare:
+        webshare_username = os.getenv('WEBSHARE_USERNAME')
+        webshare_password = os.getenv('WEBSHARE_PASSWORD')
+    
+    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password)
     metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir, force=args.force)
 
     ai_force = args.force or args.ai_only

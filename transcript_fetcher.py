@@ -7,15 +7,18 @@ A class for fetching and caching YouTube transcripts
 import os
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 from utils import extract_youtube_id
 
 
 class YouTubeTranscriptFetcher:
     """A class to fetch and cache YouTube transcripts"""
     
-    def __init__(self, cache_dir="cache", force=False):
+    def __init__(self, cache_dir="cache", force=False, webshare_username=None, webshare_password=None):
         self.cache_dir = cache_dir
         self.force = force
+        self.webshare_username = webshare_username
+        self.webshare_password = webshare_password
         self._ensure_cache_dir()
     
     def set_cache_dir(self, cache_dir):
@@ -36,9 +39,16 @@ class YouTubeTranscriptFetcher:
             if cached_data is not None:
                 return cached_data
         
-        # If no cache or force refresh, fetch from API
         try:
-            api = YouTubeTranscriptApi()
+            if self.webshare_username and self.webshare_password:
+                api = YouTubeTranscriptApi(
+                    proxy_config=WebshareProxyConfig(
+                        proxy_username=self.webshare_username,
+                        proxy_password=self.webshare_password
+                    )
+                )
+            else:
+                api = YouTubeTranscriptApi()
             transcript_data = api.fetch(video_id, languages=['en'])
         except Exception as e:
             print(f"Error downloading subtitles: {e}")
