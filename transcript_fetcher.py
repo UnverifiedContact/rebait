@@ -160,31 +160,6 @@ class YouTubeTranscriptFetcher:
             except Exception as e:
                 debug_print(f"DEBUG: Error during executor cleanup: {e}")
     
-    def _get_transcript_sequential(self, video_id, max_attempts=5):
-        """Sequential requests with delays for Termux/Android environments"""
-        import time
-        
-        print(f"Using sequential requests with {max_attempts} attempts")
-        for attempt_id in range(1, max_attempts + 1):
-            print(f"Sequential attempt {attempt_id}/{max_attempts}")
-            
-            # Add delay between attempts to allow IP rotation
-            if attempt_id > 1:
-                delay = attempt_id * 0.5  # Increasing delay: 0.5s, 1.0s, 1.5s, 2.0s
-                print(f"Waiting {delay}s before next attempt...")
-                time.sleep(delay)
-            
-            try:
-                result = self._single_transcript_attempt(video_id, attempt_id)
-                if result is not None:
-                    print(f"Sequential attempt {attempt_id} succeeded!")
-                    return result
-                else:
-                    print(f"Sequential attempt {attempt_id} failed")
-            except Exception as e:
-                print(f"Sequential attempt {attempt_id} failed with error: {e}")
-        
-        raise ValueError("All sequential attempts failed")
     
     def _single_transcript_attempt(self, video_id, attempt_id):
         """Single transcript fetch attempt with fresh proxy connection"""
