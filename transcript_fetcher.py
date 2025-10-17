@@ -103,11 +103,16 @@ class YouTubeTranscriptFetcher:
     def _get_transcript_concurrent(self, video_id, max_concurrent=5):
         """Try multiple concurrent requests to get transcript"""
         import time
+        import threading
         
         debug_print(f"DEBUG: Starting concurrent requests with {max_concurrent} attempts")
         debug_print(f"DEBUG: Video ID: {video_id}")
         
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+        # Shared cancellation flag
+        self._cancelled = threading.Event()
+        
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent)
+        try:
             futures = []
             
             debug_print(f"DEBUG: Submitting {max_concurrent} concurrent requests...")
@@ -120,20 +125,40 @@ class YouTubeTranscriptFetcher:
             
             debug_print(f"DEBUG: Waiting for first successful result from {len(futures)} requests...")
             # Wait for first successful result
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    result = future.result()
-                    if result is not None:
-                        debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, cancelling remaining {len(futures)-1} attempts")
-                        # Cancel remaining futures
-                        for f in futures:
-                            f.cancel()
-                        return result
-                except Exception as e:
-                    debug_print(f"DEBUG: Concurrent attempt failed: {e}")
+            while futures:
+                # Wait for at least one future to complete
+                done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                
+                # Check completed futures for success
+                for future in done:
+                    try:
+                        result = future.result()
+                        if result is not None:
+                            debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, cancelling remaining {len(not_done)} attempts")
+                            # Set cancellation flag to signal other threads to stop
+                            self._cancelled.set()
+                            debug_print(f"DEBUG: Cancellation signal sent, cancelling futures and returning immediately")
+                            # Cancel remaining futures
+                            for f in not_done:
+                                f.cancel()
+                            # Force shutdown executor
+                            executor.shutdown(wait=False)
+                            return result
+                    except Exception as e:
+                        debug_print(f"DEBUG: Concurrent attempt failed: {e}")
+                
+                # Remove completed futures from our list
+                futures = list(not_done)
             
             debug_print(f"DEBUG: All {max_concurrent} concurrent attempts failed")
             raise ValueError("All concurrent attempts failed")
+        finally:
+            # Ensure cancellation is set and executor is shut down
+            self._cancelled.set()
+            try:
+                executor.shutdown(wait=False)
+            except Exception as e:
+                debug_print(f"DEBUG: Error during executor cleanup: {e}")
     
     def _get_transcript_sequential(self, video_id, max_attempts=5):
         """Sequential requests with delays for Termux/Android environments"""
@@ -169,10 +194,20 @@ class YouTubeTranscriptFetcher:
         debug_print(f"DEBUG: Starting attempt {attempt_id} for video {video_id}")
         
         try:
+            # Check for cancellation before starting
+            if hasattr(self, '_cancelled') and self._cancelled.is_set():
+                debug_print(f"DEBUG: Attempt {attempt_id} CANCELLED before starting")
+                return None
+            
             # Add small random delay to spread out requests
             delay = random.uniform(0.1, 0.3)
             debug_print(f"DEBUG: Attempt {attempt_id} waiting {delay:.2f}s before request...")
             time.sleep(delay)
+            
+            # Check for cancellation after delay
+            if hasattr(self, '_cancelled') and self._cancelled.is_set():
+                debug_print(f"DEBUG: Attempt {attempt_id} CANCELLED after delay")
+                return None
             
             debug_print(f"DEBUG: Attempt {attempt_id} creating fresh API instance...")
             debug_print(f"DEBUG: Attempt {attempt_id} using Webshare username: {self.webshare_username}")
@@ -185,11 +220,26 @@ class YouTubeTranscriptFetcher:
                 )
             )
             
+            # Check for cancellation before API call
+            if hasattr(self, '_cancelled') and self._cancelled.is_set():
+                debug_print(f"DEBUG: Attempt {attempt_id} CANCELLED before API call")
+                return None
+            
             debug_print(f"DEBUG: Attempt {attempt_id} calling api.fetch()...")
             transcript_data = api.fetch(video_id, languages=['en'])
+            
+            # Check for cancellation after API call
+            if hasattr(self, '_cancelled') and self._cancelled.is_set():
+                debug_print(f"DEBUG: Attempt {attempt_id} CANCELLED after API call")
+                return None
+            
             debug_print(f"DEBUG: Attempt {attempt_id} SUCCESS! Got {len(transcript_data)} segments")
             return transcript_data
         except Exception as e:
+            # Check if this was due to cancellation
+            if hasattr(self, '_cancelled') and self._cancelled.is_set():
+                debug_print(f"DEBUG: Attempt {attempt_id} CANCELLED during execution")
+                return None
             debug_print(f"DEBUG: Attempt {attempt_id} FAILED with error: {str(e)[:200]}")
             return None
     
