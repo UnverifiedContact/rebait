@@ -16,7 +16,7 @@ class YouTubeMetadataFetcher:
     def __init__(self, cache_dir="cache", api_url=None, context=None, force=False):
         self.cache_dir = cache_dir
         self.api_url = api_url or "https://www.youtube.com/youtubei/v1/player?key={api_key}"
-        self.context = context or {"client": {"clientName": "WEB", "clientVersion": "2.0"}}
+        self.context = context or {"client": {"clientName": "WEB", "clientVersion": "2.20251016.01.00"}}
         self.watch_url = "https://www.youtube.com/watch?v={video_id}"
         self.force = force
         self._ensure_cache_dir()
@@ -47,15 +47,34 @@ class YouTubeMetadataFetcher:
             # Get API key from watch page
             api_key = self._get_api_key(video_id)
             
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Content-Type': 'application/json',
+                'Origin': 'https://www.youtube.com',
+                'Referer': f'https://www.youtube.com/watch?v={video_id}',
+                'X-YouTube-Client-Name': '1',
+                'X-YouTube-Client-Version': '2.20251016.01.00',
+            }
+            
             response = requests.post(
                 self.api_url.format(api_key=api_key),
                 json={
                     "context": self.context,
                     "videoId": video_id,
                 },
+                headers=headers
             )
             response.raise_for_status()
             data = response.json()
+            
+            # Check for playability issues
+            playability_status = data.get('playabilityStatus', {})
+            if playability_status.get('status') != 'OK':
+                reason = playability_status.get('reason', 'Unknown error')
+                raise ValueError(f"Video not playable: {reason}")
             
             video_details = data.get('videoDetails', {})
             
