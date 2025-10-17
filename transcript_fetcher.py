@@ -31,28 +31,44 @@ class YouTubeTranscriptFetcher:
             os.makedirs(self.cache_dir)
     
     def get_transcript(self, url):
+        print(f"DEBUG: get_transcript called with URL: {url}")
         video_id = extract_youtube_id(url)
+        print(f"DEBUG: Extracted video ID: {video_id}")
         if not video_id:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
         if not self.force:
+            print("DEBUG: Checking cache...")
             cached_data = self._load_from_cache(video_id)
             if cached_data is not None:
+                print("DEBUG: Found cached data, returning cached result")
                 return cached_data
+            print("DEBUG: No cached data found, proceeding to fetch")
         
         # Try concurrent requests if using Webshare proxies, fallback to single request
+        print(f"DEBUG: Webshare credentials available: {bool(self.webshare_username and self.webshare_password)}")
         if self.webshare_username and self.webshare_password:
+            print("DEBUG: Using Webshare proxies, attempting concurrent requests")
             try:
                 transcript_data = self._get_transcript_concurrent(video_id)
+                print("DEBUG: Concurrent requests succeeded!")
             except Exception as e:
-                print(f"Concurrent requests failed, trying single request: {e}")
+                print(f"DEBUG: Concurrent requests failed, trying single request: {e}")
                 try:
+                    print("DEBUG: Attempting single request with Webshare proxies...")
                     transcript_data = self._get_transcript_single(video_id)
+                    print("DEBUG: Single request with proxies succeeded!")
                 except Exception as e2:
-                    print(f"Error downloading subtitles: {e2}")
+                    print(f"DEBUG: Single request with proxies failed: {e2}")
                     raise ValueError("Failed to download subtitles for this video")
         else:
-            transcript_data = self._get_transcript_single(video_id)
+            print("DEBUG: No Webshare credentials, using single request without proxies")
+            try:
+                transcript_data = self._get_transcript_single(video_id)
+                print("DEBUG: Single request without proxies succeeded!")
+            except Exception as e:
+                print(f"DEBUG: Single request without proxies failed: {e}")
+                raise ValueError("Failed to download subtitles for this video")
         
         transcript_data_dict = [{'text': entry.text, 'start': entry.start, 'duration': entry.duration} for entry in transcript_data]
         
@@ -75,38 +91,36 @@ class YouTubeTranscriptFetcher:
     def _get_transcript_concurrent(self, video_id, max_concurrent=5):
         """Try multiple concurrent requests to get transcript"""
         import time
-        import os
         
-        # Detect if running on Android/Termux
-        is_termux = os.path.exists('/data/data/com.termux/files/usr')
+        print(f"DEBUG: Starting concurrent requests with {max_concurrent} attempts")
+        print(f"DEBUG: Video ID: {video_id}")
         
-        if is_termux:
-            print("Detected Termux environment, using sequential requests with delays")
-            return self._get_transcript_sequential(video_id, max_concurrent)
-        
-        print(f"Using concurrent requests with {max_concurrent} attempts")
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
             futures = []
             
+            print(f"DEBUG: Submitting {max_concurrent} concurrent requests...")
             # Submit multiple concurrent requests with staggered timing
             for i in range(max_concurrent):
+                print(f"DEBUG: Submitting request {i+1}/{max_concurrent}")
                 future = executor.submit(self._single_transcript_attempt, video_id, i+1)
                 futures.append(future)
                 time.sleep(0.3)  # Small delay between submissions to spread out requests
             
+            print(f"DEBUG: Waiting for first successful result from {len(futures)} requests...")
             # Wait for first successful result
             for future in concurrent.futures.as_completed(futures):
                 try:
                     result = future.result()
                     if result is not None:
-                        print(f"Concurrent request succeeded, cancelling remaining {len(futures)-1} attempts")
+                        print(f"DEBUG: SUCCESS! Concurrent request succeeded, cancelling remaining {len(futures)-1} attempts")
                         # Cancel remaining futures
                         for f in futures:
                             f.cancel()
                         return result
                 except Exception as e:
-                    print(f"Concurrent attempt failed: {e}")
+                    print(f"DEBUG: Concurrent attempt failed: {e}")
             
+            print(f"DEBUG: All {max_concurrent} concurrent attempts failed")
             raise ValueError("All concurrent attempts failed")
     
     def _get_transcript_sequential(self, video_id, max_attempts=5):
@@ -140,12 +154,16 @@ class YouTubeTranscriptFetcher:
         import time
         import random
         
+        print(f"DEBUG: Starting attempt {attempt_id} for video {video_id}")
+        
         try:
             # Add small random delay to spread out requests
             delay = random.uniform(0.1, 0.3)
+            print(f"DEBUG: Attempt {attempt_id} waiting {delay:.2f}s before request...")
             time.sleep(delay)
             
-            print(f"Attempt {attempt_id}: Creating fresh API instance...")
+            print(f"DEBUG: Attempt {attempt_id} creating fresh API instance...")
+            print(f"DEBUG: Attempt {attempt_id} using Webshare username: {self.webshare_username}")
             
             # Create fresh API instance for each attempt
             api = YouTubeTranscriptApi(
@@ -155,12 +173,12 @@ class YouTubeTranscriptFetcher:
                 )
             )
             
-            print(f"Attempt {attempt_id}: Fetching transcript...")
+            print(f"DEBUG: Attempt {attempt_id} calling api.fetch()...")
             transcript_data = api.fetch(video_id, languages=['en'])
-            print(f"Attempt {attempt_id}: SUCCESS - {len(transcript_data)} segments")
+            print(f"DEBUG: Attempt {attempt_id} SUCCESS! Got {len(transcript_data)} segments")
             return transcript_data
         except Exception as e:
-            print(f"Attempt {attempt_id}: FAILED - {str(e)[:100]}...")
+            print(f"DEBUG: Attempt {attempt_id} FAILED with error: {str(e)[:200]}")
             return None
     
     def _get_cache_path(self, video_id):
