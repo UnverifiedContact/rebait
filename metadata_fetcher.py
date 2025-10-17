@@ -16,7 +16,7 @@ class YouTubeMetadataFetcher:
     def __init__(self, cache_dir="cache", api_url=None, context=None, force=False):
         self.cache_dir = cache_dir
         self.api_url = api_url or "https://www.youtube.com/youtubei/v1/player?key={api_key}"
-        self.context = context or {"client": {"clientName": "WEB", "clientVersion": "2.0"}}
+        self.context = context or {"client": {"clientName": "ANDROID", "clientVersion": "20.10.38"}}
         self.watch_url = "https://www.youtube.com/watch?v={video_id}"
         self.force = force
         self._ensure_cache_dir()
