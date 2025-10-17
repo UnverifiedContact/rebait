@@ -97,8 +97,16 @@ def main():
     webshare_username = None
     webshare_password = None
     if not args.no_webshare:
+        print(f"DEBUG: Loading Webshare credentials from environment...")
         webshare_username = os.getenv('WEBSHARE_USERNAME')
         webshare_password = os.getenv('WEBSHARE_PASSWORD')
+        print(f"DEBUG: WEBSHARE_USERNAME from env: {webshare_username}")
+        print(f"DEBUG: WEBSHARE_PASSWORD from env: {'***' if webshare_password else None}")
+        print(f"DEBUG: args.no_webshare: {args.no_webshare}")
+    else:
+        print(f"DEBUG: Skipping Webshare credentials due to --no-webshare flag")
+    
+    print(f"DEBUG: About to create YouTubeTranscriptFetcher with username: {webshare_username}")
     
     transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password)
     metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir, force=args.force)

@@ -16,10 +16,15 @@ class YouTubeTranscriptFetcher:
     """A class to fetch and cache YouTube transcripts"""
     
     def __init__(self, cache_dir="cache", force=False, webshare_username=None, webshare_password=None):
+        print(f"DEBUG: YouTubeTranscriptFetcher.__init__ called")
+        print(f"DEBUG: webshare_username passed: {webshare_username}")
+        print(f"DEBUG: webshare_password passed: {'***' if webshare_password else None}")
         self.cache_dir = cache_dir
         self.force = force
         self.webshare_username = webshare_username
         self.webshare_password = webshare_password
+        print(f"DEBUG: Final webshare_username: {self.webshare_username}")
+        print(f"DEBUG: Final webshare_password: {'***' if self.webshare_password else None}")
         self._ensure_cache_dir()
     
     def set_cache_dir(self, cache_dir):
