@@ -112,14 +112,24 @@ class YouTubeTranscriptFetcher:
             
             debug_print(f"DEBUG: Waiting for first successful result from {len(futures)} requests...")
             # Wait for first successful result
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    result = future.result()
-                    if result is not None:
-                        debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, returning immediately")
-                        return result
-                except Exception as e:
-                    debug_print(f"DEBUG: Concurrent attempt failed: {e}")
+            while futures:
+                done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                
+                for future in done:
+                    try:
+                        result = future.result()
+                        if result is not None:
+                            debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, returning immediately")
+                            return result
+                    except Exception as e:
+                        debug_print(f"DEBUG: Concurrent attempt failed: {e}")
+                
+                # Remove completed futures from our list
+                futures = list(not_done)
+                
+                # If we have no more futures to wait for, break
+                if not futures:
+                    break
             
             debug_print(f"DEBUG: All {max_concurrent} concurrent attempts failed")
             raise ValueError("All concurrent attempts failed")
