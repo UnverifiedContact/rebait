@@ -72,21 +72,34 @@ class YouTubeTranscriptFetcher:
             api = YouTubeTranscriptApi()
         return api.fetch(video_id, languages=['en'])
     
-    def _get_transcript_concurrent(self, video_id, max_concurrent=3):
+    def _get_transcript_concurrent(self, video_id, max_concurrent=5):
         """Try multiple concurrent requests to get transcript"""
+        import time
+        import os
+        
+        # Detect if running on Android/Termux
+        is_termux = os.path.exists('/data/data/com.termux/files/usr')
+        
+        if is_termux:
+            print("Detected Termux environment, using sequential requests with delays")
+            return self._get_transcript_sequential(video_id, max_concurrent)
+        
+        print(f"Using concurrent requests with {max_concurrent} attempts")
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
             futures = []
             
-            # Submit multiple concurrent requests
+            # Submit multiple concurrent requests with staggered timing
             for i in range(max_concurrent):
                 future = executor.submit(self._single_transcript_attempt, video_id, i+1)
                 futures.append(future)
+                time.sleep(0.3)  # Small delay between submissions to spread out requests
             
             # Wait for first successful result
             for future in concurrent.futures.as_completed(futures):
                 try:
                     result = future.result()
                     if result is not None:
+                        print(f"Concurrent request succeeded, cancelling remaining {len(futures)-1} attempts")
                         # Cancel remaining futures
                         for f in futures:
                             f.cancel()
@@ -96,9 +109,44 @@ class YouTubeTranscriptFetcher:
             
             raise ValueError("All concurrent attempts failed")
     
+    def _get_transcript_sequential(self, video_id, max_attempts=5):
+        """Sequential requests with delays for Termux/Android environments"""
+        import time
+        
+        print(f"Using sequential requests with {max_attempts} attempts")
+        for attempt_id in range(1, max_attempts + 1):
+            print(f"Sequential attempt {attempt_id}/{max_attempts}")
+            
+            # Add delay between attempts to allow IP rotation
+            if attempt_id > 1:
+                delay = attempt_id * 0.5  # Increasing delay: 0.5s, 1.0s, 1.5s, 2.0s
+                print(f"Waiting {delay}s before next attempt...")
+                time.sleep(delay)
+            
+            try:
+                result = self._single_transcript_attempt(video_id, attempt_id)
+                if result is not None:
+                    print(f"Sequential attempt {attempt_id} succeeded!")
+                    return result
+                else:
+                    print(f"Sequential attempt {attempt_id} failed")
+            except Exception as e:
+                print(f"Sequential attempt {attempt_id} failed with error: {e}")
+        
+        raise ValueError("All sequential attempts failed")
+    
     def _single_transcript_attempt(self, video_id, attempt_id):
         """Single transcript fetch attempt with fresh proxy connection"""
+        import time
+        import random
+        
         try:
+            # Add small random delay to spread out requests
+            delay = random.uniform(0.1, 0.3)
+            time.sleep(delay)
+            
+            print(f"Attempt {attempt_id}: Creating fresh API instance...")
+            
             # Create fresh API instance for each attempt
             api = YouTubeTranscriptApi(
                 proxy_config=WebshareProxyConfig(
@@ -106,9 +154,13 @@ class YouTubeTranscriptFetcher:
                     proxy_password=self.webshare_password
                 )
             )
+            
+            print(f"Attempt {attempt_id}: Fetching transcript...")
             transcript_data = api.fetch(video_id, languages=['en'])
+            print(f"Attempt {attempt_id}: SUCCESS - {len(transcript_data)} segments")
             return transcript_data
         except Exception as e:
+            print(f"Attempt {attempt_id}: FAILED - {str(e)[:100]}...")
             return None
     
     def _get_cache_path(self, video_id):
