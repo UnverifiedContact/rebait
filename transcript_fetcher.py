@@ -72,7 +72,7 @@ class YouTubeTranscriptFetcher:
             api = YouTubeTranscriptApi()
         return api.fetch(video_id, languages=['en'])
     
-    def _get_transcript_concurrent(self, video_id, max_concurrent=5):
+    def _get_transcript_concurrent(self, video_id, max_concurrent=3):
         """Try multiple concurrent requests to get transcript"""
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
             futures = []
