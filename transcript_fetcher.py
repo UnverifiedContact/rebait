@@ -6,6 +6,7 @@ A class for fetching and caching YouTube transcripts
 
 import os
 import json
+import concurrent.futures
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
 from utils import extract_youtube_id
@@ -39,25 +40,76 @@ class YouTubeTranscriptFetcher:
             if cached_data is not None:
                 return cached_data
         
-        try:
-            if self.webshare_username and self.webshare_password:
-                api = YouTubeTranscriptApi(
-                    proxy_config=WebshareProxyConfig(
-                        proxy_username=self.webshare_username,
-                        proxy_password=self.webshare_password
-                    )
-                )
-            else:
-                api = YouTubeTranscriptApi()
-            transcript_data = api.fetch(video_id, languages=['en'])
-        except Exception as e:
-            print(f"Error downloading subtitles: {e}")
-            raise ValueError("Failed to download subtitles for this video")
+        # Try concurrent requests if using Webshare proxies, fallback to single request
+        if self.webshare_username and self.webshare_password:
+            try:
+                transcript_data = self._get_transcript_concurrent(video_id)
+            except Exception as e:
+                print(f"Concurrent requests failed, trying single request: {e}")
+                try:
+                    transcript_data = self._get_transcript_single(video_id)
+                except Exception as e2:
+                    print(f"Error downloading subtitles: {e2}")
+                    raise ValueError("Failed to download subtitles for this video")
+        else:
+            transcript_data = self._get_transcript_single(video_id)
         
         transcript_data_dict = [{'text': entry.text, 'start': entry.start, 'duration': entry.duration} for entry in transcript_data]
         
         self._save_to_cache(video_id, transcript_data_dict)
         return transcript_data_dict
+    
+    def _get_transcript_single(self, video_id):
+        """Single transcript fetch attempt"""
+        if self.webshare_username and self.webshare_password:
+            api = YouTubeTranscriptApi(
+                proxy_config=WebshareProxyConfig(
+                    proxy_username=self.webshare_username,
+                    proxy_password=self.webshare_password
+                )
+            )
+        else:
+            api = YouTubeTranscriptApi()
+        return api.fetch(video_id, languages=['en'])
+    
+    def _get_transcript_concurrent(self, video_id, max_concurrent=5):
+        """Try multiple concurrent requests to get transcript"""
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+            futures = []
+            
+            # Submit multiple concurrent requests
+            for i in range(max_concurrent):
+                future = executor.submit(self._single_transcript_attempt, video_id, i+1)
+                futures.append(future)
+            
+            # Wait for first successful result
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    result = future.result()
+                    if result is not None:
+                        # Cancel remaining futures
+                        for f in futures:
+                            f.cancel()
+                        return result
+                except Exception as e:
+                    print(f"Concurrent attempt failed: {e}")
+            
+            raise ValueError("All concurrent attempts failed")
+    
+    def _single_transcript_attempt(self, video_id, attempt_id):
+        """Single transcript fetch attempt with fresh proxy connection"""
+        try:
+            # Create fresh API instance for each attempt
+            api = YouTubeTranscriptApi(
+                proxy_config=WebshareProxyConfig(
+                    proxy_username=self.webshare_username,
+                    proxy_password=self.webshare_password
+                )
+            )
+            transcript_data = api.fetch(video_id, languages=['en'])
+            return transcript_data
+        except Exception as e:
+            return None
     
     def _get_cache_path(self, video_id):
         """Get the cache file path for a video ID"""
