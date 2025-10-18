@@ -105,34 +105,56 @@ class YouTubeTranscriptFetcher:
         debug_print(f"DEBUG: Starting concurrent requests with {max_concurrent} attempts")
         debug_print(f"DEBUG: Video ID: {video_id}")
         
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
-            # Submit all requests at once
-            futures = [executor.submit(self._single_transcript_attempt, video_id, i+1) 
-                      for i in range(max_concurrent)]
+        import threading
+        import queue
+        
+        # Use a queue to communicate results between threads
+        result_queue = queue.Queue()
+        stop_event = threading.Event()
+        
+        def worker_thread(attempt_id):
+            """Worker thread that runs a single attempt"""
+            if stop_event.is_set():
+                debug_print(f"DEBUG: Attempt {attempt_id} cancelled before starting")
+                return
+                
+            try:
+                result = self._single_transcript_attempt(video_id, attempt_id)
+                if result is not None and not stop_event.is_set():
+                    debug_print(f"DEBUG: Attempt {attempt_id} SUCCESS! Got {len(result)} segments")
+                    result_queue.put(result)
+                    stop_event.set()  # Signal other threads to stop
+                else:
+                    debug_print(f"DEBUG: Attempt {attempt_id} completed but result was None or cancelled")
+            except Exception as e:
+                if not stop_event.is_set():
+                    debug_print(f"DEBUG: Attempt {attempt_id} FAILED with error: {str(e)[:200]}")
+        
+        # Start all worker threads
+        threads = []
+        for i in range(max_concurrent):
+            thread = threading.Thread(target=worker_thread, args=(i+1,))
+            thread.daemon = True
+            thread.start()
+            threads.append(thread)
+        
+        debug_print(f"DEBUG: Waiting for first successful result from {max_concurrent} requests...")
+        
+        try:
+            # Wait for first successful result with timeout
+            result = result_queue.get(timeout=60)  # 60 second timeout
+            debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, stopping remaining {max_concurrent-1} attempts")
+            return result
+        except queue.Empty:
+            debug_print(f"DEBUG: Timeout waiting for result from {max_concurrent} concurrent attempts")
+            raise ValueError("All concurrent attempts failed or timed out")
+        finally:
+            # Signal all threads to stop
+            stop_event.set()
             
-            debug_print(f"DEBUG: Waiting for first successful result from {len(futures)} requests...")
-            # Wait for first successful result
-            while futures:
-                done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
-                
-                for future in done:
-                    try:
-                        result = future.result()
-                        if result is not None:
-                            debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, returning immediately")
-                            return result
-                    except Exception as e:
-                        debug_print(f"DEBUG: Concurrent attempt failed: {e}")
-                
-                # Remove completed futures from our list
-                futures = list(not_done)
-                
-                # If we have no more futures to wait for, break
-                if not futures:
-                    break
-            
-            debug_print(f"DEBUG: All {max_concurrent} concurrent attempts failed")
-            raise ValueError("All concurrent attempts failed")
+            # Wait a short time for threads to finish gracefully
+            for thread in threads:
+                thread.join(timeout=1)
     
     
     def _single_transcript_attempt(self, video_id, attempt_id):
