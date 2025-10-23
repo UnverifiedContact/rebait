@@ -66,7 +66,7 @@ def fetch_video_data(transcript_fetcher, metadata_fetcher, url, video_id):
     
     def timed_fetch_metadata():
         with Timer("metadata") as timer:
-            result = metadata_fetcher.fetch_metadata(video_id)
+            result = metadata_fetcher.fetch_metadata()
         return result, timer.duration
     
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -115,7 +115,7 @@ def main():
     debug_print(f"DEBUG: About to create YouTubeTranscriptFetcher with username: {webshare_username}")
     
     transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password)
-    metadata_fetcher = YouTubeMetadataFetcher(cache_dir=cache_dir, force=args.force)
+    metadata_fetcher = YouTubeMetadataFetcher(video_id=video_id, cache_dir=cache_dir, force=args.force)
 
     ai_force = args.force or args.ai_only
     ai_service = AIService(api_key=api_key, force=ai_force)
