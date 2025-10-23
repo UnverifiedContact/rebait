@@ -10,20 +10,24 @@ import json
 import os
 import yt_dlp
 from bs4 import BeautifulSoup
+from utils import parse_duration_iso8601
 
 
 class YouTubeMetadataFetcher:
     """Modular metadata fetcher with multiple fallback methods"""
     
-    def __init__(self, cache_dir="cache", api_url=None, context=None, force=False):
+    def __init__(self, video_id, cache_dir="cache", innertube_url=None, context=None, force=False, youtube_data_api_key=None, youtube_api_url=None):
+        self.video_id = video_id
         self.cache_dir = cache_dir
-        self.api_url = api_url or "https://www.youtube.com/youtubei/v1/player?key={api_key}"
+        self.youtube_api_url = youtube_api_url or "https://www.googleapis.com/youtube/v3/videos"
+        self.youtube_data_api_key = youtube_data_api_key
+        self.innertube_url = innertube_url or "https://www.youtube.com/youtubei/v1/player?key={api_key}"
         self.context = context or {"client": {"clientName": "WEB", "clientVersion": "2.20251016.01.00"}}
-        self.watch_url = "https://www.youtube.com/watch?v={video_id}"
+        self.video_url = "https://www.youtube.com/watch?v={video_id}"
         self.force = force
+
         self._ensure_cache_dir()
         
-        # Initialize yt-dlp options
         self.ytdl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -41,27 +45,28 @@ class YouTubeMetadataFetcher:
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
     
-    def fetch_metadata(self, video_id):
+    def fetch_metadata(self):
         if not self.force:
-            cached_data = self._load_from_cache(video_id)
+            cached_data = self._load_from_cache(self.video_id)
             if cached_data is not None:
                 return cached_data
         
         # Try multiple methods in order of preference
         methods = [
+            ("youtube_data_api_direct", self._fetch_from_youtube_data_api),
             ("innertube_api", self._fetch_from_innertube_api),
-            ("yt_dlp", self._fetch_from_ytdlp),
             ("oembed_api", self._fetch_from_oembed_api),
+            ("yt_dlp", self._fetch_from_ytdlp),
             ("web_scraping", self._fetch_from_web_scraping),
         ]
         
         last_error = None
         for method_name, method_func in methods:
             try:
-                print(f"Trying {method_name} for video {video_id}...")
-                metadata = method_func(video_id)
+                print(f"Trying {method_name} for video {self.video_id}...")
+                metadata = method_func()
                 if metadata:
-                    self._save_to_cache(video_id, metadata)
+                    self._save_to_cache(self.video_id, metadata)
                     print(f"Successfully fetched metadata using {method_name}")
                     return metadata
                 else:
@@ -75,13 +80,58 @@ class YouTubeMetadataFetcher:
                 continue
         
         # If all methods failed
-        raise ValueError(f"All metadata fetching methods failed for video {video_id}. Last error: {last_error}")
+        raise ValueError(f"All metadata fetching methods failed for video {self.video_id}. Last error: {last_error}")
     
-    def _fetch_from_innertube_api(self, video_id):
+    def _fetch_from_youtube_data_api(self):
+        """Fetch video metadata using YouTube Data API v3 direct URL"""
+        try:
+            if not self.youtube_data_api_key:
+                raise ValueError("YouTube Data API key not provided")
+            
+            # Construct the API URL
+            params = {
+                'part': 'snippet,contentDetails',
+                'id': self.video_id,
+                'key': self.youtube_data_api_key
+            }
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            }
+            
+            response = requests.get(self.youtube_api_url, params=params, headers=headers)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Check if video was found
+            if not data.get('items'):
+                raise ValueError(f"Video {self.video_id} not found or not accessible")
+            
+            video = data['items'][0]
+            snippet = video.get('snippet', {})
+            content_details = video.get('contentDetails', {})
+            
+            # Parse duration from ISO 8601 format (PT4M13S -> 253 seconds)
+            duration_iso = content_details.get('duration', '')
+            duration_seconds = parse_duration_iso8601(duration_iso)
+            
+            return {
+                'title': snippet.get('title', ''),
+                'duration': str(duration_seconds) if duration_seconds else '',
+                'description': snippet.get('description', ''),
+                'channel_name': snippet.get('channelTitle', ''),
+                'channel_id': snippet.get('channelId', ''),
+                'keywords': snippet.get('tags', []),
+            }
+        except Exception as e:
+            raise ValueError(f"YouTube Data API v3 direct failed: {e}")
+    
+    def _fetch_from_innertube_api(self):
         """Fetch video metadata from innertube API"""
         try:
             # Get API key from watch page
-            api_key = self._get_api_key(video_id)
+            api_key = self._get_api_key(self.video_id)
             
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -90,16 +140,16 @@ class YouTubeMetadataFetcher:
                 'Accept-Encoding': 'gzip, deflate, br',
                 'Content-Type': 'application/json',
                 'Origin': 'https://www.youtube.com',
-                'Referer': f'https://www.youtube.com/watch?v={video_id}',
+                'Referer': f'https://www.youtube.com/watch?v={self.video_id}',
                 'X-YouTube-Client-Name': '1',
                 'X-YouTube-Client-Version': '2.20251016.01.00',
             }
             
             response = requests.post(
-                self.api_url.format(api_key=api_key),
+                self.innertube_url.format(api_key=api_key),
                 json={
                     "context": self.context,
-                    "videoId": video_id,
+                    "videoId": self.video_id,
                 },
                 headers=headers
             )
@@ -167,7 +217,7 @@ class YouTubeMetadataFetcher:
     
     def _get_api_key(self, video_id):
         """Extract innertube API key from watch page"""
-        response = requests.get(self.watch_url.format(video_id=video_id))
+        response = requests.get(self.video_url.format(video_id=video_id))
         response.raise_for_status()
         
         match = re.search(r'"INNERTUBE_API_KEY":\s*"([a-zA-Z0-9_-]+)"', response.text)
@@ -176,12 +226,11 @@ class YouTubeMetadataFetcher:
         
         return match.group(1)
     
-    def _fetch_from_ytdlp(self, video_id):
-        """Fetch video metadata using yt-dlp"""
+    def _fetch_from_ytdlp(self):
         try:
-            url = f"https://www.youtube.com/watch?v={video_id}"
+            
             with yt_dlp.YoutubeDL(self.ytdl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+                info = ydl.extract_info(self.video_url, download=False)
                 
                 return {
                     'title': info.get('title', ''),
@@ -194,10 +243,10 @@ class YouTubeMetadataFetcher:
         except Exception as e:
             raise ValueError(f"yt-dlp failed: {e}")
     
-    def _fetch_from_oembed_api(self, video_id):
+    def _fetch_from_oembed_api(self):
         """Fetch basic metadata using YouTube's oEmbed API"""
         try:
-            url = f"https://www.youtube.com/watch?v={video_id}"
+            url = self.video_url
             oembed_url = f"https://www.youtube.com/oembed?url={url}&format=json"
             
             headers = {
@@ -224,10 +273,10 @@ class YouTubeMetadataFetcher:
         except Exception as e:
             raise ValueError(f"oEmbed API failed: {e}")
     
-    def _fetch_from_web_scraping(self, video_id):
+    def _fetch_from_web_scraping(self):
         """Fetch basic metadata by scraping the YouTube watch page"""
         try:
-            url = f"https://www.youtube.com/watch?v={video_id}"
+
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -238,7 +287,7 @@ class YouTubeMetadataFetcher:
                 'Upgrade-Insecure-Requests': '1',
             }
             
-            response = requests.get(url, headers=headers)
+            response = requests.get(self.video_url, headers=headers)
             response.raise_for_status()
             
             # Try to extract data from JSON-LD structured data first

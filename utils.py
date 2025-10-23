@@ -1,6 +1,7 @@
 import re
 import os
 import time
+from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 
 
@@ -77,6 +78,30 @@ def format_duration(seconds: float) -> str:
             return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}s"
         else:
             return f"{minutes:02d}:{remaining_seconds:02d}s"
+
+def debug_print(message):
+    """Print debug message with timestamp"""
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]  # Include milliseconds
+    print(f"[{timestamp}] {message}")
+
+
+def parse_duration_iso8601(duration_iso: str) -> int | None:
+    """Parse ISO 8601 duration format (PT4M13S) to seconds"""
+    if not duration_iso:
+        return None
+    
+    # Match PT(optional hours)H(optional minutes)M(optional seconds)S
+    pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?'
+    match = re.match(pattern, duration_iso)
+    
+    if not match:
+        return None
+    
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    
+    return hours * 3600 + minutes * 60 + seconds
 
 
 def format_video_duration(seconds: float) -> str:

@@ -11,18 +11,13 @@ import time
 from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
-from utils import extract_youtube_id
-
-def debug_print(message):
-    """Print debug message with timestamp"""
-    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]  # Include milliseconds
-    print(f"[{timestamp}] {message}")
+from utils import extract_youtube_id, debug_print
 
 
 class YouTubeTranscriptFetcher:
     """A class to fetch and cache YouTube transcripts"""
     
-    def __init__(self, cache_dir="cache", force=False, webshare_username=None, webshare_password=None):
+    def __init__(self, cache_dir="cache", force=False, webshare_username=None, webshare_password=None, max_concurrent_requests=2):
         debug_print(f"DEBUG: YouTubeTranscriptFetcher.__init__ called")
         debug_print(f"DEBUG: webshare_username passed: {webshare_username}")
         debug_print(f"DEBUG: webshare_password passed: {'***' if webshare_password else None}")
@@ -30,6 +25,9 @@ class YouTubeTranscriptFetcher:
         self.force = force
         self.webshare_username = webshare_username
         self.webshare_password = webshare_password
+        self.max_concurrent_requests = max_concurrent_requests
+        debug_print(f"DEBUG: Max concurrent requests: {self.max_concurrent_requests}")
+        
         debug_print(f"DEBUG: Final webshare_username: {self.webshare_username}")
         debug_print(f"DEBUG: Final webshare_password: {'***' if self.webshare_password else None}")
         self._ensure_cache_dir()
@@ -100,9 +98,9 @@ class YouTubeTranscriptFetcher:
             api = YouTubeTranscriptApi()
         return api.fetch(video_id, languages=['en'])
     
-    def _get_transcript_concurrent(self, video_id, max_concurrent=5):
+    def _get_transcript_concurrent(self, video_id):
         """Try multiple concurrent requests to get transcript"""
-        debug_print(f"DEBUG: Starting concurrent requests with {max_concurrent} attempts")
+        debug_print(f"DEBUG: Starting concurrent requests with {self.max_concurrent_requests} attempts")
         debug_print(f"DEBUG: Video ID: {video_id}")
         
         import threading
@@ -132,21 +130,21 @@ class YouTubeTranscriptFetcher:
         
         # Start all worker threads
         threads = []
-        for i in range(max_concurrent):
+        for i in range(self.max_concurrent_requests):
             thread = threading.Thread(target=worker_thread, args=(i+1,))
             thread.daemon = True
             thread.start()
             threads.append(thread)
         
-        debug_print(f"DEBUG: Waiting for first successful result from {max_concurrent} requests...")
+        debug_print(f"DEBUG: Waiting for first successful result from {self.max_concurrent_requests} requests...")
         
         try:
             # Wait for first successful result with timeout
             result = result_queue.get(timeout=60)  # 60 second timeout
-            debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, stopping remaining {max_concurrent-1} attempts")
+            debug_print(f"DEBUG: SUCCESS! Concurrent request succeeded, stopping remaining {self.max_concurrent_requests-1} attempts")
             return result
         except queue.Empty:
-            debug_print(f"DEBUG: Timeout waiting for result from {max_concurrent} concurrent attempts")
+            debug_print(f"DEBUG: Timeout waiting for result from {self.max_concurrent_requests} concurrent attempts")
             raise ValueError("All concurrent attempts failed or timed out")
         finally:
             # Signal all threads to stop
