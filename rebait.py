@@ -7,10 +7,14 @@ from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dotenv import load_dotenv
 from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
 from utils import extract_youtube_id, Timer, format_duration, format_video_duration
+
+# Load environment variables from .env file
+load_dotenv()
 
 def debug_print(message):
     """Print debug message with timestamp"""
@@ -115,7 +119,10 @@ def main():
     debug_print(f"DEBUG: About to create YouTubeTranscriptFetcher with username: {webshare_username}")
     
     transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password)
-    metadata_fetcher = YouTubeMetadataFetcher(video_id=video_id, cache_dir=cache_dir, force=args.force)
+    
+    # Get YouTube Data API v3 key from environment
+    youtube_api_key = os.getenv('YOUTUBE_V3_API_KEY')
+    metadata_fetcher = YouTubeMetadataFetcher(video_id=video_id, cache_dir=cache_dir, force=args.force, youtube_data_api_key=youtube_api_key)
 
     ai_force = args.force or args.ai_only
     ai_service = AIService(api_key=api_key, force=ai_force)
