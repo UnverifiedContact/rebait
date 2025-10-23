@@ -17,7 +17,14 @@ from utils import extract_youtube_id, debug_print
 class YouTubeTranscriptFetcher:
     """A class to fetch and cache YouTube transcripts"""
     
-    def __init__(self, cache_dir="cache", force=False, webshare_username=None, webshare_password=None, max_concurrent_requests=2):
+    def __init__(
+        self, 
+        cache_dir="cache", 
+        force=False, 
+        webshare_username=None, 
+        webshare_password=None, 
+        max_concurrent_requests=2
+    ):
         debug_print(f"DEBUG: YouTubeTranscriptFetcher.__init__ called")
         debug_print(f"DEBUG: webshare_username passed: {webshare_username}")
         debug_print(f"DEBUG: webshare_password passed: {'***' if webshare_password else None}")

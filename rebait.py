@@ -118,7 +118,9 @@ def main():
     
     debug_print(f"DEBUG: About to create YouTubeTranscriptFetcher with username: {webshare_username}")
     
-    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password)
+    # Get max concurrent requests from environment
+    max_concurrent_requests = int(os.getenv('TRANSCRIPT_MAX_CONCURRENT_REQUESTS', '2'))
+    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password, max_concurrent_requests=max_concurrent_requests)
     
     # Get YouTube Data API v3 key from environment
     youtube_api_key = os.getenv('YOUTUBE_V3_API_KEY')
