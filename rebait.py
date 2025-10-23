@@ -3,30 +3,85 @@
 import os
 import json
 import argparse
+import requests
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
-from transcript_fetcher import YouTubeTranscriptFetcher
 from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
-from utils import extract_youtube_id, Timer, format_duration, format_video_duration
+from utils import extract_youtube_id, Timer, format_duration, format_video_duration, debug_print
 
 # Load environment variables from .env file
 load_dotenv()
 
-def debug_print(message):
-    """Print debug message with timestamp"""
-    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]  # Include milliseconds
-    print(f"[{timestamp}] {message}")
+def fetch_transcript_from_service(video_id, service_host, service_port, cache_dir, force=False):
+    """Fetch transcript from external HTTP service with caching"""
+    # Check cache first if not forcing refresh
+    if not force:
+        cache_path = os.path.join(cache_dir, video_id, 'transcript.json')
+        if os.path.exists(cache_path):
+            debug_print("DEBUG: Found cached transcript, returning cached result")
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    
+    # Make HTTP request to external service
+    url = f"http://{service_host}:{service_port}/transcript/{video_id}?force={int(force)}"
+    debug_print(f"DEBUG: Making request to: {url}")
+    
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    
+    transcript_data = response.json()
+    debug_print(f"DEBUG: Received {len(transcript_data.get('transcript', transcript_data))} transcript segments")
+    
+    # Save to cache
+    os.makedirs(os.path.join(cache_dir, video_id), exist_ok=True)
+    cache_path = os.path.join(cache_dir, video_id, 'transcript.json')
+    with open(cache_path, 'w', encoding='utf-8') as f:
+        json.dump(transcript_data, f, indent=2, ensure_ascii=False)
+    
+    return transcript_data
 
-def validate_cached_data(video_id, transcript_fetcher, metadata_fetcher):
+def generate_flattened_text(transcript_data, video_id, cache_dir):
+    """Generate flattened text from transcript data"""
+    import re
+    
+    if transcript_data is None:
+        return ""
+    
+    # Extract transcript segments from response format
+    transcript_segments = transcript_data['transcript']
+    
+    regex_pattern = re.compile(r'^\s*>>\s*')
+    cache_folder = os.path.join(cache_dir, video_id)
+    output_path = os.path.join(cache_folder, 'flattened.txt')
+    
+    flattened_lines = []
+    for segment in transcript_segments:
+        text = segment.get('text', '')
+        if regex_pattern.match(text):
+            # Remove >> prefix for dialogue lines
+            clean_text = regex_pattern.sub('', text)
+            flattened_lines.append(clean_text)
+        elif text.strip():  # Include all non-empty text segments
+            flattened_lines.append(text)
+    
+    flattened_text = '\n'.join(flattened_lines)
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(flattened_text)
+    
+    return flattened_text
+
+def validate_cached_data(video_id, cache_dir, metadata_fetcher):
     """Validate that required cached files exist for AI-only mode. Returns list of missing files."""
     missing_files = []
     
     # Check transcript cache
-    if transcript_fetcher._load_from_cache(video_id) is None:
+    transcript_path = os.path.join(cache_dir, video_id, 'transcript.json')
+    if not os.path.exists(transcript_path):
         missing_files.append('transcript.json')
     
     # Check metadata cache
@@ -34,13 +89,13 @@ def validate_cached_data(video_id, transcript_fetcher, metadata_fetcher):
         missing_files.append('metadata.json')
     
     # Check flattened text cache
-    flattened_path = os.path.join(transcript_fetcher.cache_dir, video_id, 'flattened.txt')
+    flattened_path = os.path.join(cache_dir, video_id, 'flattened.txt')
     if not os.path.exists(flattened_path):
         missing_files.append('flattened.txt')
     
     return missing_files
 
-def load_cached_data(video_id, cache_dir):
+def load_cached_data(video_id, cache_dir, metadata_fetcher):
     """Load cached transcript, metadata, and flattened text"""
     video_cache_dir = os.path.join(cache_dir, video_id)
     
@@ -50,9 +105,7 @@ def load_cached_data(video_id, cache_dir):
         transcript = json.load(f)
     
     # Load metadata
-    metadata_path = os.path.join(video_cache_dir, 'metadata.json')
-    with open(metadata_path, 'r', encoding='utf-8') as f:
-        metadata = json.load(f)
+    metadata = metadata_fetcher._load_from_cache(video_id)
     
     # Load flattened text
     flattened_path = os.path.join(video_cache_dir, 'flattened.txt')
@@ -61,11 +114,11 @@ def load_cached_data(video_id, cache_dir):
     
     return transcript, metadata, flattened_text
 
-def fetch_video_data(transcript_fetcher, metadata_fetcher, url, video_id):
+def fetch_video_data(cache_dir, metadata_fetcher, url, video_id, service_host, service_port, force=False):
     """Fetch transcript and metadata in parallel with timing"""
     def timed_get_transcript():
         with Timer("transcript") as timer:
-            result = transcript_fetcher.get_transcript(url)
+            result = fetch_transcript_from_service(video_id, service_host, service_port, cache_dir, force)
         return result, timer.duration
     
     def timed_fetch_metadata():
@@ -89,7 +142,6 @@ def main():
     parser.add_argument('--gemini-key', help='Gemini API key (optional, defaults to GEMINI_API_KEY env var)')
     parser.add_argument('-f', '--force', action='store_true', help='Force refresh all cached data')
     parser.add_argument('-a', '--ai-only', action='store_true', help='Only run the AI step to regenerate title, skip transcript/metadata fetching (requires existing cached data)')
-    parser.add_argument('-n', '--no-webshare', action='store_true', help='Do not use webshare credentials')
     
     args = parser.parse_args()
     cache_dir = args.cache_dir
@@ -104,23 +156,12 @@ def main():
         print("Error: Gemini API key must be provided via --gemini-key argument or GEMINI_API_KEY environment variable")
         return 1
     
-    webshare_username = None
-    webshare_password = None
-    if not args.no_webshare:
-        debug_print(f"DEBUG: Loading Webshare credentials from environment...")
-        webshare_username = os.getenv('WEBSHARE_USERNAME')
-        webshare_password = os.getenv('WEBSHARE_PASSWORD')
-        debug_print(f"DEBUG: WEBSHARE_USERNAME from env: {webshare_username}")
-        debug_print(f"DEBUG: WEBSHARE_PASSWORD from env: {'***' if webshare_password else None}")
-        debug_print(f"DEBUG: args.no_webshare: {args.no_webshare}")
-    else:
-        debug_print(f"DEBUG: Skipping Webshare credentials due to --no-webshare flag")
+    debug_print(f"DEBUG: Using HTTP transcript service...")
     
-    debug_print(f"DEBUG: About to create YouTubeTranscriptFetcher with username: {webshare_username}")
-    
-    # Get max concurrent requests from environment
-    max_concurrent_requests = int(os.getenv('TRANSCRIPT_MAX_CONCURRENT_REQUESTS', '2'))
-    transcript_fetcher = YouTubeTranscriptFetcher(cache_dir=cache_dir, force=args.force, webshare_username=webshare_username, webshare_password=webshare_password, max_concurrent_requests=max_concurrent_requests)
+    # Get transcript service configuration from environment
+    service_host = os.getenv('TRANSCRIPT_SERVICE_HOST', 'localhost')
+    service_port = os.getenv('TRANSCRIPT_SERVICE_PORT', '5485')
+    debug_print(f"DEBUG: Service host: {service_host}, port: {service_port}")
     
     # Get YouTube Data API v3 key from environment
     youtube_api_key = os.getenv('YOUTUBE_V3_API_KEY')
@@ -134,24 +175,24 @@ def main():
         with Timer("total") as total_timer:
             if args.ai_only:
                 # Validate cached data exists
-                missing_files = validate_cached_data(video_id, transcript_fetcher, metadata_fetcher)
+                missing_files = validate_cached_data(video_id, cache_dir, metadata_fetcher)
                 if missing_files:
                     # Fallback to normal mode if cache is missing
                     transcript, transcript_duration, metadata, metadata_duration = \
-                        fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
+                        fetch_video_data(cache_dir, metadata_fetcher, args.url, video_id, service_host, service_port, args.force)
                     
-                    flattened_text = transcript_fetcher.generate_flattened(transcript, video_id)
+                    flattened_text = generate_flattened_text(transcript, video_id, cache_dir)
                 else:
                     # Load cached data
-                    transcript, metadata, flattened_text = load_cached_data(video_id, cache_dir)
+                    transcript, metadata, flattened_text = load_cached_data(video_id, cache_dir, metadata_fetcher)
                     transcript_duration = 0  # No time spent fetching
                     metadata_duration = 0    # No time spent fetching
             else:
                 # Normal flow: fetch transcript and metadata
                 transcript, transcript_duration, metadata, metadata_duration = \
-                    fetch_video_data(transcript_fetcher, metadata_fetcher, args.url, video_id)
+                    fetch_video_data(cache_dir, metadata_fetcher, args.url, video_id, service_host, service_port, args.force)
                 
-                flattened_text = transcript_fetcher.generate_flattened(transcript, video_id)
+                flattened_text = generate_flattened_text(transcript, video_id, cache_dir)
             
             final_prompt = ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
           
