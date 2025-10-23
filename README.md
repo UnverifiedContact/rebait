@@ -30,10 +30,20 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Set up Google Gemini API key:
+4. Set up environment variables:
 ```bash
-export GOOGLE_API_KEY="your-api-key-here"
+# Copy the example environment file
+cp env.example .env
+
+# Edit .env with your actual API keys and service configuration
+nano .env
 ```
+
+Required environment variables:
+- `GEMINI_API_KEY`: Your Google Gemini API key
+- `TRANSCRIPT_SERVICE_HOST`: Host for transcript service (default: localhost)
+- `TRANSCRIPT_SERVICE_PORT`: Port for transcript service (default: 5485)
+- `YOUTUBE_V3_API_KEY`: Your YouTube Data API v3 key (optional, for metadata)
 
 ## Usage
 
@@ -67,13 +77,27 @@ The tool outputs JSON with timing information and AI-generated summary:
 }
 ```
 
+## Configuration
+
+### Transcript Service
+The tool now uses an external HTTP service for transcript fetching instead of direct YouTube API calls. Configure the service endpoint using:
+
+- `TRANSCRIPT_SERVICE_HOST`: Hostname or IP of the transcript service (default: localhost)
+- `TRANSCRIPT_SERVICE_PORT`: Port number of the transcript service (default: 5485)
+
+The service should respond to GET requests at: `http://{host}:{port}/transcript/{video_id}`
+
+### Environment Variables
+All configuration is done through environment variables. See `env.example` for a complete list of available options.
+
 ## How It Works
 
 1. **Parallel Fetching**: Simultaneously fetches transcript and metadata
-2. **Caching**: Checks cache first to avoid redundant API calls
-3. **Text Processing**: Filters transcript to extract dialogue lines
-4. **AI Analysis**: Sends processed content to Gemini for intelligent summarization
-5. **Performance Tracking**: Measures and reports timing for each operation
+2. **External Service**: Uses HTTP service for transcript fetching
+3. **Caching**: Checks cache first to avoid redundant API calls
+4. **Text Processing**: Filters transcript to extract dialogue lines
+5. **AI Analysis**: Sends processed content to Gemini for intelligent summarization
+6. **Performance Tracking**: Measures and reports timing for each operation
 
 ## Cache Structure
 
@@ -123,8 +147,8 @@ The tool gracefully handles:
 ## Development
 
 The codebase is modular with separate components:
-- `transcript_fetcher.py`: Handles YouTube transcript API
+- `rebait.py`: Main CLI interface with HTTP transcript service integration
 - `metadata_fetcher.py`: Fetches video metadata
 - `ai_service.py`: Manages Gemini API interactions
 - `utils.py`: Utility functions and timing
-- `rebait.py`: Main CLI interface
+- `env.example`: Environment variables template
