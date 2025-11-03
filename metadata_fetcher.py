@@ -118,6 +118,7 @@ class YouTubeMetadataFetcher:
             
             return {
                 'title': snippet.get('title', ''),
+                'original_title': snippet.get('originalTitle', snippet.get('title', '')),
                 'duration': str(duration_seconds) if duration_seconds else '',
                 'description': snippet.get('description', ''),
                 'channel_name': snippet.get('channelTitle', ''),
@@ -174,6 +175,7 @@ class YouTubeMetadataFetcher:
             
             return {
                 'title': video_details.get('title', ''),
+                'original_title': video_details.get('originalTitle', video_details.get('title', '')),
                 'duration': video_details.get('lengthSeconds', ''),
                 'description': video_details.get('shortDescription', ''),
                 'channel_name': video_details.get('author', ''),
@@ -234,6 +236,7 @@ class YouTubeMetadataFetcher:
                 
                 return {
                     'title': info.get('title', ''),
+                    'original_title': info.get('original_title', info.get('title', '')),
                     'duration': str(info.get('duration', '')),
                     'description': info.get('description', ''),
                     'channel_name': info.get('uploader', ''),
@@ -264,6 +267,7 @@ class YouTubeMetadataFetcher:
             
             return {
                 'title': data.get('title', ''),
+                'original_title': data.get('title', ''),
                 'duration': '',  # oEmbed doesn't provide duration
                 'description': '',  # oEmbed doesn't provide description
                 'channel_name': data.get('author_name', ''),
@@ -375,6 +379,7 @@ class YouTubeMetadataFetcher:
             
             return {
                 'title': title,
+                'original_title': title,
                 'duration': duration,
                 'description': description,
                 'channel_name': channel_name,
