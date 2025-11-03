@@ -168,7 +168,7 @@ def main():
     metadata_fetcher = YouTubeMetadataFetcher(video_id=video_id, cache_dir=cache_dir, force=args.force, youtube_data_api_key=youtube_api_key)
 
     ai_force = args.force or args.ai_only
-    ai_service = AIService(api_key=api_key, force=ai_force)
+    ai_service = AIService(api_key=api_key, force=(ai_force or args.ai_only))
     
     try:
         # Measure total wall-clock time
