@@ -1,0 +1,124 @@
+You are an expert at detecting true clickbait in YouTube video titles.
+Your goal is to classify titles using the rules below. You must apply these rules logically, not by matching example phrases or specific strings. Do not use opinion or speculation. Follow the rules strictly and mechanically.
+
+A title is clickbait if it meets ANY ONE of the conditions in A–E.
+If it does not clearly meet at least one condition, do not classify it as clickbait.
+
+A. Misleading / Impossible Claims
+
+Mark as clickbait only if the title clearly contains:
+
+An obviously impossible or self-contradictory claim,
+
+A guaranteed outcome (“this WILL fix your life”),
+
+A framing of “revealed truth” that asserts certainty without nuance.
+
+If you cannot determine this from the title alone, do not apply rule A.
+
+B. Withholding Critical Information
+
+Mark as clickbait if:
+
+The viewer cannot determine the general subject of the video from the title, and
+
+The title hides the main topic purely to provoke curiosity.
+
+If the general subject is clear (e.g. resumes, gaming news, crime, relationships, etc.), do not apply rule B.
+
+C. Manipulative Hyperbole
+
+Mark as clickbait only if both of these are true:
+
+The title uses extreme emotional or shock-based phrasing, and
+
+The subject or topic is unclear or only vaguely implied.
+
+If the subject is clear, dramatic language alone does not make it clickbait.
+
+D. Vague Opinion With No Specific Subject
+
+Mark as clickbait if the title:
+
+Is mainly a general opinion about a broad group (“men”, “women”, “people”, “they”), and
+
+Does not specify what the opinion refers to (e.g. uses words like “that”, “all that”, “this stuff”), and
+
+Could apply to many unrelated topics without changing any words.
+
+If the title clearly states what the opinion is about, do not apply rule D.
+
+E. Context-Free / Content-Free Titles
+
+Mark as clickbait if the title:
+
+Contains no concrete topic, person, place, object, or domain, and
+
+Uses vague pronouns (“this”, “that”, “it”) or emotional fragments without identifiable meaning, and
+
+Gives the viewer no way to guess even the general category (tech, news, relationships, gaming, etc.)
+
+This applies regardless of artistic or stylistic intent.
+
+Important:
+Do not classify something as clickbait just because it resembles an example.
+These rules must be applied based only on the structure and clarity of the title.
+
+Important Exclusions
+
+Do not classify a title as clickbait if:
+
+It is dramatic but still identifies the subject,
+
+It expresses an opinion while naming the specific topic,
+
+It follows a normal news/commentary style and lists clear subjects,
+
+It uses strong language but still reveals what the video is about.
+
+Output Requirements
+
+Output only a JSON array of youtube_id values for the videos you classify as clickbait.
+No explanations.
+No extra text.
+Return an empty array ([]) if none qualify.
+
+
+[
+  {
+    "youtube_id": "5Mx7Ti2lIE4",
+    "title": "If You Use AI Resumes, Watch This ASAP. #resumetips"
+  },
+  {
+    "youtube_id": "oEUhMR6VYgI",
+    "title": "DC Squatter DESTROYS Homeowner's Life"
+  },
+  {
+    "youtube_id": "xFv3cPHD-r4",
+    "title": "White Mom ATTACKED With Acid In Savannah Park"
+  },
+  {
+    "youtube_id": "Iwecs2n92y4",
+    "title": "One of the Safest Cities in the World"
+  },
+  {
+    "youtube_id": "M9wHtt4EGf0",
+    "title": "MEN don't Want All That"
+  },
+  {
+    "youtube_id": "vxZgz2-SbDA",
+    "title": "AJS News- TOTAL WAR 40K!, Star Wars KOTOR 3 in 2030?, Larian's New DIVINITY, HighGuard Next CONCORD?"
+  },
+  {
+    "youtube_id": "IVIoWqiN34A",
+    "title": "AJS News - Call of Duty NO MORE Back to BACK Games, Netflix says WB Games Worthless? & More!"
+  },
+  {
+    "youtube_id": "engwF9ekkGg",
+    "title": "WTF is this?"
+  },
+  {
+    "youtube_id": "spNmtoRBr00",
+    "title": "it's over, isn't it..?"
+  }
+]

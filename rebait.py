@@ -4,13 +4,11 @@ import os
 import json
 import argparse
 import requests
-from pathlib import Path
-from typing import Dict, Any
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from metadata_fetcher import YouTubeMetadataFetcher
 from ai_service import AIService
+from qualify import qualify
 from utils import extract_youtube_id, Timer, format_duration, format_video_duration, debug_print
 
 # Load environment variables from .env file
@@ -135,15 +133,10 @@ def fetch_video_data(cache_dir, metadata_fetcher, url, video_id, service_host, s
     
     return transcript, transcript_duration, metadata, metadata_duration
 
-def main():
-    parser = argparse.ArgumentParser(description='Fetch YouTube transcripts')
-    parser.add_argument('url', help='YouTube video URL')
-    parser.add_argument('--cache-dir', default=os.path.join(os.environ.get('TMP', '/tmp'), 'rebait_cache'), help='Cache directory path (default: $TMP/rebait_cache)')
-    parser.add_argument('--gemini-key', help='Gemini API key (optional, defaults to GEMINI_API_KEY env var)')
-    parser.add_argument('-f', '--force', action='store_true', help='Force refresh all cached data')
-    parser.add_argument('-a', '--ai-only', action='store_true', help='Only run the AI step to regenerate title, skip transcript/metadata fetching (requires existing cached data)')
-    
-    args = parser.parse_args()
+
+
+def run_title(args):
+    """Run the title generation command (original functionality)"""
     cache_dir = args.cache_dir
     
     video_id = extract_youtube_id(args.url)
@@ -197,7 +190,7 @@ def main():
             final_prompt = ai_service.generate_prompt(video_id, cache_dir, metadata, flattened_text)
           
             with Timer("gemini") as gemini_timer:
-                gemini_response = ai_service.process_with_gemini(
+                gemini_response = ai_service.process_with_llm(
                     video_id, cache_dir, metadata, flattened_text, final_prompt
                 )
         
@@ -220,6 +213,33 @@ def main():
         return 1
     
     return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Rebait - YouTube video analysis tools')
+    
+    # Add qualify flag
+    parser.add_argument('-q', '--qualify', action='store_true', help='Analyze YouTube video titles for clickbait/inaccuracy')
+    
+    # Title mode arguments (default mode)
+    parser.add_argument('url', nargs='?', help='YouTube video URL (required for title mode)')
+    parser.add_argument('--cache-dir', default=os.path.join(os.environ.get('TMP', '/tmp'), 'rebait_cache'), help='Cache directory path (default: $TMP/rebait_cache)')
+    parser.add_argument('--gemini-key', help='Gemini API key (optional, defaults to GEMINI_API_KEY env var)')
+    parser.add_argument('-f', '--force', action='store_true', help='Force refresh all cached data')
+    parser.add_argument('-a', '--ai-only', action='store_true', help='Only run the AI step to regenerate title, skip transcript/metadata fetching (requires existing cached data)')
+    
+    args = parser.parse_args()
+    
+    # If qualify flag is set, run qualify mode
+    if args.qualify:
+        qualify()
+        return 0
+    
+    # Default: title mode (requires URL)
+    if not args.url:
+        parser.error("url is required for title mode")
+    
+    return run_title(args)
 
 
 if __name__ == "__main__":
