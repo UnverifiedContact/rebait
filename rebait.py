@@ -209,6 +209,7 @@ def main():
             "gemini_time": gemini_timer.get_duration(),
             "total_time": format_duration(total_seconds),
             "video_duration": format_video_duration(int(metadata.get('duration', 0)) if metadata.get('duration', '').strip() else 0),
+            "channel_name": metadata.get('channel_name', ''),
             "original_title": metadata.get('original_title', ''),
             "title": gemini_response.strip()
         }
